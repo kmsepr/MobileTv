@@ -15,10 +15,10 @@ COPY start.sh /scripts/start.sh
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Set permissions
-RUN chmod +x /scripts/start.sh
+RUN chmod +x /scripts/stream.sh
 
 # Expose HTTP port
 EXPOSE 80
 
 # Start server
-CMD ["/bin/bash", "/scripts/start.sh"]
+CMD ["/bin/bash", "/scripts/stream.sh"]
