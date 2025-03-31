@@ -1,34 +1,23 @@
-# Use Ubuntu as the base image
 FROM ubuntu:latest
 
-# Install dependencies
+# Install required packages
 RUN apt update && apt install -y \
+    apache2 \
     ffmpeg \
-    git \
-    nginx \
-    build-essential \
-    libssl-dev \
-    zlib1g-dev \
+    yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and build SRS (Simple RTMP Server)
-RUN git clone --depth=1 https://github.com/ossrs/srs.git /srs \
-    && cd /srs/trunk \
-    && ./configure --rtmp-server \
-    && make
+# Enable Apache modules for MP4 streaming
+RUN a2enmod rewrite headers
 
-# Ensure the configuration directory exists
-RUN mkdir -p /srs/conf
+# Create a directory for MP4 files
+RUN mkdir -p /var/www/html/videos
 
-# Copy the SRS config file
-COPY conf/srs.conf /srs/conf/srs.conf
+# Set the document root to videos directory
+RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/videos|' /etc/apache2/sites-available/000-default.conf
 
-# Copy the streaming script
-COPY stream.sh /stream.sh
-RUN chmod +x /stream.sh
+# Expose HTTP port
+EXPOSE 80
 
-# Expose necessary ports
-EXPOSE 1935 8080 1985
-
-# Start SRS and FFmpeg
-CMD ["/stream.sh"]
+# Start Apache
+CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
