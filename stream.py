@@ -18,7 +18,6 @@ RADIO_STATIONS = {
 
 }
 
-
 # 🔄 Streaming function with error handling
 def generate_stream(url):
     process = None
@@ -27,39 +26,41 @@ def generate_stream(url):
             process.kill()  # Stop old FFmpeg instance before restarting
         
         process = subprocess.Popen(
-    [
-        "ffmpeg", 
-        "-reconnect", "1", 
-        "-reconnect_streamed", "1", 
-        "-reconnect_delay_max", "10", 
-        "-max_delay", "1000",  # Limit the max delay to prevent excessive buffering
-        "-i", url, 
-        "-vn", 
-        "-ac", "1",  # Mono audio for efficiency
-        "-b:a", "40k", 
-        "-buffer_size", "4096k",  # Larger buffer size to handle stream fluctuations
-        "-c:a", "libmp3lame", 
-        "-f", "mp3", 
-        "-"
-    ],
-    stdout=subprocess.PIPE, 
-    stderr=subprocess.PIPE, 
-    bufsize=16384
-)
+            [
+                "ffmpeg", 
+                "-reconnect", "1", 
+                "-reconnect_streamed", "1", 
+                "-reconnect_delay_max", "10", 
+                "-max_delay", "1000",  # Limit the max delay to prevent excessive buffering
+                "-i", url, 
+                "-vn", 
+                "-ac", "1",  # Mono audio for efficiency
+                "-b:a", "40k", 
+                "-buffer_size", "4096k",  # Larger buffer size to handle stream fluctuations
+                "-c:a", "libmp3lame", 
+                "-f", "mp3", 
+                "-"
+            ],
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            bufsize=16384
+        )
 
         print(f"🎵 Streaming from: {url} (Mono, 40kbps)")
 
         try:
+            # Stream the audio
             for chunk in iter(lambda: process.stdout.read(8192), b""):
                 yield chunk
         except GeneratorExit:
+            # Handle generator exit (when the client disconnects)
             process.kill()
             break
         except Exception as e:
             print(f"⚠️ Stream error: {e}")
 
         print("🔄 FFmpeg stopped, restarting stream...")
-        time.sleep(5)  # Wait before restarting
+        time.sleep(5)  # Wait before restarting to prevent immediate restart
 
 # 🌍 API to stream selected station
 @app.route("/<station_name>")
