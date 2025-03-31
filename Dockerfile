@@ -11,27 +11,21 @@ RUN apt update && apt install -y \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and build SRS
+# Clone and build SRS (Simple RTMP Server)
 RUN git clone --depth=1 https://github.com/ossrs/srs.git /srs \
     && cd /srs \
-    && ./configure --rtmp-server && make
+    && ./configure --rtmp-server \
+    && make
+
+# Ensure the configuration directory exists
+RUN mkdir -p /srs/conf
 
 # Copy the SRS config file
 COPY conf/srs.conf /srs/conf/srs.conf
 
-# Copy the stream script
+# Copy the streaming script
 COPY stream.sh /stream.sh
 RUN chmod +x /stream.sh
 
-# Configure Nginx to serve MP4 files
-RUN echo 'server { \
-    listen 80; \
-    location / { root /var/www/html; index index.html; } \
-    location /stream.mp4 { add_header Content-Type video/mp4; } \
-}' > /etc/nginx/sites-enabled/default
-
-# Expose ports (RTMP & HTTP)
-EXPOSE 1935 80
-
-# Start services
-CMD service nginx start && /stream.sh
+# Expose necessary ports
+EXPOSE 1935 8080
