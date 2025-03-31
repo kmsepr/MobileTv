@@ -1,17 +1,18 @@
 #!/bin/bash
 
-# Define variables
-YOUTUBE_URL=$1
-OUTPUT_FILE="symbian_video.mp4"
+# Start Nginx
+service nginx start
 
-# Download YouTube video
-yt-dlp -f "best" -o "video.mp4" "$YOUTUBE_URL"
+# Check if a video URL is provided
+if [ -n "$YOUTUBE_URL" ]; then
+    echo "Downloading video from: $YOUTUBE_URL"
+    
+    # Download and convert
+    yt-dlp -f best -o "/videos/video.mp4" "$YOUTUBE_URL"
+    ffmpeg -i "/videos/video.mp4" -vf "scale=320:240" -c:v libx264 -b:v 500k -c:a aac -b:a 64k "/videos/symbian_video.mp4"
 
-# Convert to Symbian-compatible format
-ffmpeg -i video.mp4 -vf "scale=320:240" -c:v libx264 -b:v 500k -c:a aac -b:a 64k $OUTPUT_FILE
+    echo "Video ready at: http://your-server-ip/videos/symbian_video.mp4"
+fi
 
-# Move to Apache directory
-mv $OUTPUT_FILE /var/www/html/videos/
-
-# Output the streaming URL
-echo "Your video is ready at: http://localhost/videos/$OUTPUT_FILE"
+# Keep container running
+tail -f /dev/null
