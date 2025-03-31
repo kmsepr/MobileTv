@@ -1,24 +1,21 @@
-# Base image
-FROM ubuntu:latest
+# Use an official lightweight Python image
+FROM python:3.9-slim
 
-# Install required packages
-RUN apt update && apt install -y \
-    nginx ffmpeg python3-pip \
-    && pip3 install yt-dlp \
-    && rm -rf /var/lib/apt/lists/*
+# Install dependencies
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-# Create necessary directories
-RUN mkdir -p /videos /scripts
+# Set the working directory
+WORKDIR /app
 
-# Copy scripts & config
-COPY stream.sh /scripts/stream.sh
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy the application files
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Set permissions
-RUN chmod +x /scripts/stream.sh
+COPY . .
 
-# Expose HTTP port
-EXPOSE 80
+# Expose port 8000
+EXPOSE 8000
 
-# Start server
-CMD ["/bin/bash", "/scripts/stream.sh"]
+# Run the application
+CMD ["python", "stream.py"]
+
