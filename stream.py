@@ -32,8 +32,8 @@ def generate_stream(url):
                 "-reconnect_delay_max", "10", "-fflags", "nobuffer", "-flags", "low_delay",
                 "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-buffer_size", "1024k", "-f", "mp3", "-"
             ],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=16384
-)
+stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=8192
+        )
 
         print(f"🎵 Streaming from: {url} (Mono, 40kbps)")
 
