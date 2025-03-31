@@ -1,13 +1,17 @@
 #!/bin/bash
 
-VIDEO_URL="$1"
-OUTPUT_DIR="/var/www/html/videos"
-OUTPUT_FILE="$OUTPUT_DIR/video.mp4"
+# Define variables
+YOUTUBE_URL=$1
+OUTPUT_FILE="symbian_video.mp4"
 
-# Download the video
-yt-dlp -f "best" -o "$OUTPUT_FILE" "$VIDEO_URL"
+# Download YouTube video
+yt-dlp -f "best" -o "video.mp4" "$YOUTUBE_URL"
 
-# Convert to Symbian-compatible format (H.264 + AAC)
-ffmpeg -i "$OUTPUT_FILE" -vf "scale=320:240" -c:v libx264 -b:v 500k -c:a aac -b:a 64k "$OUTPUT_DIR/symbian_video.mp4"
+# Convert to Symbian-compatible format
+ffmpeg -i video.mp4 -vf "scale=320:240" -c:v libx264 -b:v 500k -c:a aac -b:a 64k $OUTPUT_FILE
 
-echo "Video ready: http://your-server-ip/videos/symbian_video.mp4"
+# Move to Apache directory
+mv $OUTPUT_FILE /var/www/html/videos/
+
+# Output the streaming URL
+echo "Your video is ready at: http://localhost/videos/$OUTPUT_FILE"
