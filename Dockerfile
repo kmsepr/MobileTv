@@ -11,7 +11,7 @@ RUN apt update && apt install -y \
 RUN mkdir -p /videos /scripts
 
 # Copy scripts & config
-COPY start.sh /scripts/start.sh
+COPY start.sh /scripts/stream.sh
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Set permissions
