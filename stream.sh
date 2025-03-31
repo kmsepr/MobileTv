@@ -1,15 +1,13 @@
 #!/bin/bash
 
-# Start SRS server
-cd /srs && ./objs/srs -c conf/srs.conf &
+VIDEO_URL="$1"
+OUTPUT_DIR="/var/www/html/videos"
+OUTPUT_FILE="$OUTPUT_DIR/video.mp4"
 
-# Wait for SRS to initialize
-sleep 5
+# Download the video
+yt-dlp -f "best" -o "$OUTPUT_FILE" "$VIDEO_URL"
 
-# Start FFmpeg streaming to an MP4 file (FastStart for progressive playback)
-ffmpeg -re -i "http://ktv.im:8080/44444/44444/81825" \
-    -c:v libx264 -b:v 300k -movflags +faststart \
-    -c:a aac -b:a 32k -f mp4 /var/www/html/stream.mp4
+# Convert to Symbian-compatible format (H.264 + AAC)
+ffmpeg -i "$OUTPUT_FILE" -vf "scale=320:240" -c:v libx264 -b:v 500k -c:a aac -b:a 64k "$OUTPUT_DIR/symbian_video.mp4"
 
-# Keep the container running
-tail -f /dev/null
+echo "Video ready: http://your-server-ip/videos/symbian_video.mp4"
