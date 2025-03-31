@@ -13,7 +13,7 @@ RUN apt update && apt install -y \
 
 # Clone and build SRS (Simple RTMP Server)
 RUN git clone --depth=1 https://github.com/ossrs/srs.git /srs \
-    && cd /srs \
+    && cd /srs/trunk \
     && ./configure --rtmp-server \
     && make
 
