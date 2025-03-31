@@ -1,21 +1,37 @@
-FROM debian:latest
+# Use Ubuntu as the base image
+FROM ubuntu:latest
 
 # Install dependencies
 RUN apt update && apt install -y \
-    apache2 ffmpeg wget curl \
-    libssl-dev libxml2-dev libvo-amrwbenc-dev \
+    ffmpeg \
+    git \
+    nginx \
+    build-essential \
+    libssl-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up Apache
-RUN mkdir -p /var/www/html/videos && \
-    chown -R www-data:www-data /var/www/html/videos
+# Clone and build SRS
+RUN git clone --depth=1 https://github.com/ossrs/srs.git /srs \
+    && cd /srs \
+    && ./configure --rtmp-server && make
+
+# Copy the SRS config file
+COPY conf/srs.conf /srs/conf/srs.conf
 
 # Copy the stream script
-COPY stream.sh /usr/local/bin/stream.sh
-RUN chmod +x /usr/local/bin/stream.sh
+COPY stream.sh /stream.sh
+RUN chmod +x /stream.sh
 
-# Expose HTTP port
-EXPOSE 80
+# Configure Nginx to serve MP4 files
+RUN echo 'server { \
+    listen 80; \
+    location / { root /var/www/html; index index.html; } \
+    location /stream.mp4 { add_header Content-Type video/mp4; } \
+}' > /etc/nginx/sites-enabled/default
 
-# Run stream script and start Apache
-CMD ["/bin/bash", "-c", "/usr/local/bin/stream.sh & apachectl -D FOREGROUND"]
+# Expose ports (RTMP & HTTP)
+EXPOSE 1935 80
+
+# Start services
+CMD service nginx start && /stream.sh
