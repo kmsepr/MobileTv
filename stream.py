@@ -32,11 +32,12 @@ def generate_stream(url):
         "-reconnect", "1", 
         "-reconnect_streamed", "1", 
         "-reconnect_delay_max", "10", 
+        "-max_delay", "1000",  # Limit the max delay to prevent excessive buffering
         "-i", url, 
         "-vn", 
-        "-ac", "1", 
+        "-ac", "1",  # Mono audio for efficiency
         "-b:a", "40k", 
-        "-buffer_size", "2048k",  # Increased buffer size for smoother streaming
+        "-buffer_size", "4096k",  # Larger buffer size to handle stream fluctuations
         "-c:a", "libmp3lame", 
         "-f", "mp3", 
         "-"
