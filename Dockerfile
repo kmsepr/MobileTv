@@ -1,26 +1,24 @@
-# Use Ubuntu as the base image
+# Base image
 FROM ubuntu:latest
 
-# Install necessary packages
+# Install required packages
 RUN apt update && apt install -y \
-    apache2 \
-    ffmpeg \
-    curl \
-    yt-dlp \
+    nginx ffmpeg python3-pip \
+    && pip3 install yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a directory for videos
-RUN mkdir -p /var/www/html/videos
+# Create necessary directories
+RUN mkdir -p /videos /scripts
 
-# Set the working directory
-WORKDIR /var/www/html/videos
+# Copy scripts & config
+COPY start.sh /scripts/start.sh
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy the script to container
-COPY stream.sh /stream.sh
-RUN chmod +x /stream.sh
+# Set permissions
+RUN chmod +x /scripts/start.sh
 
-# Expose Apache's HTTP port
+# Expose HTTP port
 EXPOSE 80
 
-# Start Apache server
-CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
+# Start server
+CMD ["/bin/bash", "/scripts/start.sh"]
