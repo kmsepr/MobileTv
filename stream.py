@@ -20,7 +20,8 @@ def generate_stream(url):
     process = None
     while True:
         if process:
-            process.kill()  # Stop old FFmpeg instance before restarting
+    process.kill()
+    time.sleep(1)  # Short delay before restart
         
         process = subprocess.Popen(
     [
