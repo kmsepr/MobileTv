@@ -4,8 +4,8 @@ from flask import Flask, Response
 
 app = Flask(__name__)
 
-# 📡 List of TV channels (URLs for TV streaming, but we'll stream only audio)
-TV_CHANNELS = {
+# 📡 List of TV channels to stream (as audio)
+RADIO_STATIONS = {
     "asianet_movies": "http://ktv.im:8080/44444/44444/81804",
     "surya_movies": "http://ktv.im:8080/44444/44444/81823",
     "surya_comedy": "http://ktv.im:8080/44444/44444/81825",
@@ -15,7 +15,7 @@ TV_CHANNELS = {
     "kairali_we": "http://ktv.im:8080/44444/44444/81812",
 }
 
-# 🔄 Streaming function for audio (TV channels treated like radio)
+# 🔄 Streaming function with error handling
 def generate_stream(url):
     process = None
     while True:
@@ -28,39 +28,38 @@ def generate_stream(url):
                 "-reconnect", "1", 
                 "-reconnect_streamed", "1", 
                 "-reconnect_delay_max", "10", 
-                "-max_delay", "1000",  # Limit max delay for smooth streaming
+                "-fflags", "nobuffer", 
+                "-flags", "low_delay", 
+                "-fflags", "+genpts",  # Generate PTS to prevent repeating audio
                 "-i", url, 
-                "-vn",  # Disable video (audio only)
-                "-ac", "1",  # Mono audio (1 channel)
-                "-b:a", "40k",  # Audio bitrate 40kbps
-                "-f", "mp3",  # Output format for audio streaming
-                "pipe:1"  # Output to stdout
+                "-vn", 
+                "-ac", "1", 
+                "-b:a", "40k", 
+                "-buffer_size", "4096k", 
+                "-f", "mp3", 
+                "-"
             ],
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE, 
-            bufsize=16384
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=16384
         )
 
-        print(f"🎵 Streaming audio from: {url} (Mono, 40kbps)")
+        print(f"🎵 Streaming from: {url} (Mono, 40kbps)")
 
         try:
-            # Stream the audio
             for chunk in iter(lambda: process.stdout.read(8192), b""):
                 yield chunk
         except GeneratorExit:
-            # Handle generator exit (when the client disconnects)
             process.kill()
             break
         except Exception as e:
             print(f"⚠️ Stream error: {e}")
 
         print("🔄 FFmpeg stopped, restarting stream...")
-        time.sleep(5)  # Wait before restarting to prevent immediate restart
+        time.sleep(5)  # Wait before restarting
 
-# 🌍 API to stream selected TV channel (audio only)
-@app.route("/<channel_name>")
-def stream(channel_name):
-    url = TV_CHANNELS.get(channel_name)
+# 🌍 API to stream selected channel as audio
+@app.route("/<station_name>")
+def stream(station_name):
+    url = RADIO_STATIONS.get(station_name)
     if not url:
         return "⚠️ Channel not found", 404
     
