@@ -18,4 +18,4 @@ RUN chmod +x /usr/local/bin/stream.sh
 EXPOSE 80
 
 # Run stream script and start Apache
-CMD ["/usr/local/bin/stream.sh"] && apachectl -D FOREGROUND
+CMD ["/bin/bash", "-c", "/usr/local/bin/stream.sh & apachectl -D FOREGROUND"]
