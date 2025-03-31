@@ -1,23 +1,26 @@
+# Use Ubuntu as the base image
 FROM ubuntu:latest
 
-# Install required packages
+# Install necessary packages
 RUN apt update && apt install -y \
     apache2 \
     ffmpeg \
+    curl \
     yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache modules for MP4 streaming
-RUN a2enmod rewrite headers
-
-# Create a directory for MP4 files
+# Create a directory for videos
 RUN mkdir -p /var/www/html/videos
 
-# Set the document root to videos directory
-RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/videos|' /etc/apache2/sites-available/000-default.conf
+# Set the working directory
+WORKDIR /var/www/html/videos
 
-# Expose HTTP port
+# Copy the script to container
+COPY stream.sh /stream.sh
+RUN chmod +x /stream.sh
+
+# Expose Apache's HTTP port
 EXPOSE 80
 
-# Start Apache
+# Start Apache server
 CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
