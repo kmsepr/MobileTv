@@ -19,21 +19,22 @@ RADIO_STATIONS = {
 def generate_stream(url):
     process = None
     while True:
+        # Kill old process if exists before restarting
         if process:
-    process.kill()
-    time.sleep(1)  # Short delay before restart
+            process.kill()
+            time.sleep(1)  # Short delay to ensure FFmpeg fully stops
         
+        # Start new FFmpeg process
         process = subprocess.Popen(
-    [
-        "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
-        "-reconnect_delay_max", "10", "-fflags", "nobuffer",
-        "-flags", "low_delay", "-strict", "experimental",
-        "-probesize", "32M", "-analyzeduration", "100M",
-        "-i", url, "-vn", "-ac", "1", "-b:a", "40k",
-        "-buffer_size", "4096k", "-c:a", "libmp3lame", "-f", "mp3", "-"
-    ],
-    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
-)
+            [
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10", "-fflags", "nobuffer",
+                "-flags", "low_delay", "-i", url, "-vn",
+                "-ac", "1", "-b:a", "40k", "-buffer_size", "4096k",
+                "-c:a", "libmp3lame", "-f", "mp3", "-"
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+        )
 
         print(f"🎵 Streaming from: {url} (Mono, 40kbps)")
 
