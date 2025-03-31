@@ -24,23 +24,14 @@ def generate_stream(url):
         
         process = subprocess.Popen(
     [
-        "ffmpeg", 
-        "-reconnect", "1", 
-        "-reconnect_streamed", "1", 
-        "-reconnect_delay_max", "10", 
-        "-fflags", "+genpts+nobuffer",  # Generate PTS and prevent buffer loops
-        "-flags", "low_delay", 
-        "-i", url,
-        "-vn",
-        "-ac", "1", 
-        "-b:a", "40k", 
-        "-bufsize", "4096k",  # Keep at 4096k since you found it better
-        "-probesize", "10000000",  # Increase probe size to handle large headers
-        "-analyzeduration", "10000000",  # Give FFmpeg more time to analyze
-        "-f", "mp3", 
-        "-"
+        "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
+        "-reconnect_delay_max", "10", "-fflags", "nobuffer",
+        "-flags", "low_delay", "-strict", "experimental",
+        "-probesize", "32M", "-analyzeduration", "100M",
+        "-i", url, "-vn", "-ac", "1", "-b:a", "40k",
+        "-buffer_size", "4096k", "-c:a", "libmp3lame", "-f", "mp3", "-"
     ],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=16384
+    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
 )
 
         print(f"🎵 Streaming from: {url} (Mono, 40kbps)")
