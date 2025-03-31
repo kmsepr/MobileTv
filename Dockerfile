@@ -11,14 +11,11 @@ RUN mkdir -p /var/www/html/videos && \
     chown -R www-data:www-data /var/www/html/videos
 
 # Copy the stream script
-COPY stream_to_http.sh /usr/local/bin/stream_to_http.sh
-RUN chmod +x /usr/local/bin/stream_to_http.sh
-
-# Start streaming script in the background
-RUN echo "#!/bin/bash\n/usr/local/bin/stream_to_http.sh &\nexec apachectl -D FOREGROUND" > /start.sh && chmod +x /start.sh
+COPY stream.sh /usr/local/bin/stream.sh
+RUN chmod +x /usr/local/bin/stream.sh
 
 # Expose HTTP port
 EXPOSE 80
 
-# Run script and start Apache
-CMD ["/bin/bash", "/start.sh"]
+# Run stream script and start Apache
+CMD ["/usr/local/bin/stream.sh"] && apachectl -D FOREGROUND
