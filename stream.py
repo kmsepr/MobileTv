@@ -30,8 +30,7 @@ def generate_stream(url):
         "-reconnect_delay_max", "10", 
         "-fflags", "+genpts+nobuffer",  # Generate PTS and prevent buffer loops
         "-flags", "low_delay", 
-        "-i", url, 
-        "-vn", 
+        "-i", url,  
         "-ac", "1", 
         "-b:a", "40k", 
         "-bufsize", "4096k",  # Keep at 4096k since you found it better
