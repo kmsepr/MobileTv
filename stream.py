@@ -27,11 +27,11 @@ def generate_stream(url):
             process.kill()  # Stop old FFmpeg instance before restarting
         
         process = subprocess.Popen(
-    [
-        "ffmpeg", "-re", "-protocol_whitelist", "file,http,https,tcp,tls,crypto", 
-        "-i", url, "-vn", "-ac", "2", "-b:a", "64k", "-buffer_size", "8192k", 
-        "-c:a", "libmp3lame", "-f", "mp3", "-"
-    ],
+            [
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10", "-fflags", "nobuffer", "-flags", "low_delay",
+                "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-buffer_size", "1024k", "-f", "mp3", "-"
+            ],
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=16384
 )
 
