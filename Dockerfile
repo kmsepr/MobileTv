@@ -28,4 +28,7 @@ COPY stream.sh /stream.sh
 RUN chmod +x /stream.sh
 
 # Expose necessary ports
-EXPOSE 1935 8080
+EXPOSE 1935 8080 1985
+
+# Start SRS and FFmpeg
+CMD ["/stream.sh"]
