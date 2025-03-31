@@ -1,14 +1,12 @@
 #!/bin/bash
 
-OUTPUT_DIR="/var/www/html/videos"
-OUTPUT_FILE="stream.3gp"
+# Start SRS server
+cd /srs && ./objs/srs -c conf/srs.conf &
 
-while true
-do
-    ffmpeg -re -fflags +genpts -i "https://video.yementdy.tv/hls/yementoday.m3u8" \
-        -c:v h263 -b:v 70k -r 15 -vf scale=176:144 \
-        -c:a libopencore_amrnb -b:a 12.2k -ac 1 -ar 8000 \
-        -f 3gp "$OUTPUT_DIR/$OUTPUT_FILE"
+# Wait for SRS to initialize
+sleep 5
 
-    sleep 5
-done
+# Start FFmpeg streaming to SRS RTMP
+ffmpeg -re -i "http://ktv.im:8080/44444/44444/81825" \
+    -c:v libx264 -b:v 300k -preset ultrafast -tune zerolatency \
+    -c:a aac -b:a 32k -f flv rtmp://localhost/live/stream
