@@ -13,21 +13,25 @@ YOUTUBE_STREAMS = {
 # Function to get YouTube stream URL using yt-dlp and cookies
 def get_youtube_stream_url(youtube_url):
     command = [
-        "yt-dlp", 
-        "--cookies", "/mnt/data/cookies.txt", 
-        "--force-generic-extractor", 
+        "yt-dlp",
+        "--cookies", "/mnt/data/cookies.txt",
+        "--force-generic-extractor",
+        "--no-warnings",
         "-f", "91",  # Audio format
         "-g", youtube_url  # Get the URL of the stream (without downloading)
     ]
 
     try:
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
         stream_url = result.stdout.strip()
         if stream_url:
             return stream_url
         else:
             print("⚠️ No stream URL found.")
             return None
+    except subprocess.TimeoutExpired:
+        print("⚠️ yt-dlp timeout.")
+        return None
     except Exception as e:
         print(f"⚠️ yt-dlp error: {e}")
         return None
@@ -35,39 +39,46 @@ def get_youtube_stream_url(youtube_url):
 # 🔄 Streaming function with error handling
 def generate_youtube_stream(youtube_url):
     process = None
-    while True:
-        # Get the stream URL from yt-dlp
+    retry_count = 0  # Track retries
+
+    while retry_count < 5:  # Limit retries to prevent endless loops
         stream_url = get_youtube_stream_url(youtube_url)
         if not stream_url:
-            print("⚠️ Failed to extract stream URL.")
-            time.sleep(5)  # Wait before retrying
+            print(f"⚠️ Failed to extract stream URL (Retry {retry_count}/5)")
+            retry_count += 1
+            time.sleep(5)
             continue
-        
+
         if process:
-            process.kill()  # Stop old FFmpeg instance before restarting
+            process.kill()  # Stop old FFmpeg instance
+            process.wait()
 
         process = subprocess.Popen(
             [
                 "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "10", "-fflags", "nobuffer", "-flags", "low_delay",
-                "-i", stream_url, "-vn", "-ac", "1", "-b:a", "40k", "-buffer_size", "1024k", "-f", "mp3", "-"
+                "-reconnect_delay_max", "5", "-fflags", "nobuffer", "-flags", "low_delay",
+                "-i", stream_url, "-vn", "-ac", "1", "-b:a", "40k", "-buffer_size", "512k", "-f", "mp3", "-"
             ],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=8192
         )
 
-        print(f"🎥 Extracting YouTube audio from: {youtube_url} with cookies")
+        print(f"🎥 Streaming YouTube audio: {youtube_url}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(8192), b""):
                 yield chunk
         except GeneratorExit:
+            print("🛑 Stream closed by client.")
             process.kill()
             break
         except Exception as e:
             print(f"⚠️ YouTube stream error: {e}")
 
-        print("🔄 yt-dlp stopped, restarting stream...")
+        print("🔄 FFmpeg stopped, restarting stream...")
+        retry_count += 1
         time.sleep(5)
+
+    print("❌ Max retries reached. Stopping stream.")
 
 # 🌍 API to stream selected YouTube live station
 @app.route("/<station_name>")
