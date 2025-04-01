@@ -10,21 +10,20 @@ YOUTUBE_STREAMS = {
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
 }
 
-# 🔄 Streaming function with yt-dlp and FFmpeg
-def generate_youtube_stream(youtube_url):
+# 🔄 Streaming function with error handling
+def generate_stream(url):
     process = None
     while True:
         if process:
-            process.kill()  # Stop old yt-dlp instance before restarting
-        
+            process.kill()  # Stop old FFmpeg instance before restarting
+
         process = subprocess.Popen(
             [
-                "/opt/venv/bin/yt-dlp", "-f", "bestaudio", "-o", "-", 
-                "--cookies", "/mnt/data/cookies.txt", youtube_url
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10", "-fflags", "nobuffer", "-flags", "low_delay",
+                "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-buffer_size", "1024k", "-f", "mp3", "-"
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            bufsize=8192
+stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=8192
         )
 
         print(f"🎥 Extracting YouTube audio from: {youtube_url} with cookies")
