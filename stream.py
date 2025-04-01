@@ -1,6 +1,5 @@
 import subprocess
 import time
-import yt_dlp
 from flask import Flask, Response
 
 app = Flask(__name__)
@@ -13,24 +12,25 @@ YOUTUBE_STREAMS = {
 
 # Function to get YouTube stream URL using yt-dlp and cookies
 def get_youtube_stream_url(youtube_url):
-    ydl_opts = {
-        'format': 'bestaudio/best',  # Choose the best audio stream
-        'quiet': True,
-        'extractaudio': True,  # Only extract audio
-        'audioquality': 1,  # Highest audio quality
-        'outtmpl': '-',  # Output to stdout
-        'forcejson': True,  # Force JSON output
-        'cookies': '/mnt/data/cookies.txt',  # Use cookies file for authentication
-    }
+    command = [
+        "yt-dlp", 
+        "--cookies", "/mnt/data/cookies.txt", 
+        "--force-generic-extractor", 
+        "-f", "91",  # Audio format
+        "-g", youtube_url  # Get the URL of the stream (without downloading)
+    ]
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(youtube_url, download=False)
-        if 'formats' in info_dict:
-            # Extract the best audio format URL
-            for format in info_dict['formats']:
-                if format['acodec'] != 'none' and format['ext'] == 'm4a':
-                    return format['url']
-    return None
+    try:
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stream_url = result.stdout.strip()
+        if stream_url:
+            return stream_url
+        else:
+            print("⚠️ No stream URL found.")
+            return None
+    except Exception as e:
+        print(f"⚠️ yt-dlp error: {e}")
+        return None
 
 # 🔄 Streaming function with error handling
 def generate_youtube_stream(youtube_url):
