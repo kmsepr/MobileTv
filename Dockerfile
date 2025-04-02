@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir yt-dlp Flask
 COPY app.py /app/app.py
 
 # Expose the port the app runs on
-EXPOSE 8080
+EXPOSE 8000
 
 # Command to run the app
 CMD ["python", "app.py"]
