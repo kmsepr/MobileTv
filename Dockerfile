@@ -1,18 +1,20 @@
-# Use an official Python base image
 FROM python:3.9-slim
 
-# Set working directory
+# Set the working directory
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the app code
-COPY . .
+# Install yt-dlp and Flask
+RUN pip install --no-cache-dir yt-dlp Flask
 
-# Expose the port Flask will run on
+# Copy the Flask app
+COPY app.py /app/app.py
+
+# Expose the port the app runs on
 EXPOSE 8080
 
-# Command to run the Flask app
+# Command to run the app
 CMD ["python", "app.py"]
