@@ -1,17 +1,16 @@
 FROM python:3.9-slim
 
-# Set the working directory
 WORKDIR /app
 
 # Install dependencies
-RUN apt-get update && apt-get install -y ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp and Flask
-RUN pip install --no-cache-dir yt-dlp Flask
+# Copy dependencies file and install packages
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the Flask app
-COPY app.py /app/app.py
+COPY . /app/
 
 # Expose the port the app runs on
 EXPOSE 8000
