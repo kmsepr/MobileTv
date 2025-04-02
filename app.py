@@ -20,7 +20,7 @@ def get_youtube_audio_url(youtube_url):
         command = [
             "yt-dlp",
             "--cookies", "/mnt/data/cookies.txt",
-            "-f", "bestaudio",
+            "-f", "91",
             "-g", youtube_url
         ]
         result = subprocess.run(command, capture_output=True, text=True)
