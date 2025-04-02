@@ -14,7 +14,21 @@ YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
-    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live"
+    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
+    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
+    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
+    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
+    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live", 
+    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",   
+    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",  
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",  
+    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
+    "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
+    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
+    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
+    "entri_app": "https://www.youtube.com/@entriapp/live",
+    "entri_ias": "https://www.youtube.com/@EntriIAS/live",
+    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live"
 }
 
 # 🌐 Cache for storing direct stream URLs
