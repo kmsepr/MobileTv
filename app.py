@@ -1,6 +1,5 @@
 import subprocess
 import time
-import threading
 from flask import Flask, Response
 
 app = Flask(__name__)
@@ -84,7 +83,7 @@ def generate_stream(url):
 @app.route("/<station_name>")
 def stream(station_name):
     """Serve the requested station as a live stream."""
-    url = RADIO_STATIONS.get(station_name)
+    url = YOUTUBE_STREAMS.get(station_name)
 
     if not url:
         return "Station not found", 404
