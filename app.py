@@ -1,8 +1,12 @@
 import subprocess
 import time
+import logging
 from flask import Flask, Response
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # List of radio stations & YouTube Live links
 RADIO_STATIONS = {
@@ -24,10 +28,10 @@ def get_youtube_audio_url(youtube_url):
         if result.returncode == 0:
             return result.stdout.strip()
         else:
-            print(f"Error extracting YouTube audio: {result.stderr}")
+            logging.error(f"Error extracting YouTube audio: {result.stderr}")
             return None
     except Exception as e:
-        print(f"Exception: {e}")
+        logging.error(f"Exception: {e}")
         return None
 
 def generate_stream(url):
@@ -36,7 +40,7 @@ def generate_stream(url):
         if "youtube.com" in url or "youtu.be" in url:
             url = get_youtube_audio_url(url)
             if not url:
-                print("Failed to get YouTube stream URL, retrying in 30 seconds...")
+                logging.warning("Failed to get YouTube stream URL, retrying in 30 seconds...")
                 time.sleep(30)
                 continue
 
@@ -49,7 +53,7 @@ def generate_stream(url):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=8192
         )
 
-        print(f"Streaming from: {url}")
+        logging.info(f"Streaming from: {url}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(8192), b""):
@@ -58,9 +62,9 @@ def generate_stream(url):
             process.kill()
             break
         except Exception as e:
-            print(f"Stream error: {e}")
+            logging.error(f"Stream error: {e}")
 
-        print("FFmpeg stopped, restarting stream...")
+        logging.info("FFmpeg stopped, restarting stream...")
         time.sleep(5)
 
 @app.route("/<station_name>")
