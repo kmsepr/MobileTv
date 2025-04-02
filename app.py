@@ -1,5 +1,6 @@
 import subprocess
 import time
+import threading
 from flask import Flask, Response
 
 app = Flask(__name__)
@@ -9,31 +10,20 @@ YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
-    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
-    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
-    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live", 
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",   
-    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",  
-    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",  
-    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
-    "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
-    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
-    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
-    "entri_app": "https://www.youtube.com/@entriapp/live",
-    "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live"
+    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live"
 }
+
+# 🌐 Cache for storing direct stream URLs
+CACHE = {}
 
 def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
         command = [
-            "yt-dlp",
+            "/opt/venv/bin/yt-dlp",  # Adjust if needed
             "--cookies", "/mnt/data/cookies.txt",
             "--force-generic-extractor",
-            "-f", "91",  # Ensuring -f 91 is used
+            "-f", "91",  # Audio format
             "-g", youtube_url
         ]
         result = subprocess.run(command, capture_output=True, text=True)
@@ -47,48 +37,61 @@ def get_youtube_audio_url(youtube_url):
         print(f"Exception: {e}")
         return None
 
+def refresh_stream_urls():
+    """Refresh stream URLs every 60 minutes."""
+    while True:
+        print("🔄 Refreshing stream URLs...")
+        for name, yt_url in YOUTUBE_STREAMS.items():
+            url = get_youtube_audio_url(yt_url)
+            if url:
+                CACHE[name] = url
+                print(f"✅ Updated {name}: {url}")
+            else:
+                print(f"❌ Failed to update {name}")
+        time.sleep(3600)  # Refresh every 60 minutes
+
+# Start the background thread for URL refreshing
+threading.Thread(target=refresh_stream_urls, daemon=True).start()
+
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
-        if "youtube.com" in url or "youtu.be" in url:
-            url = get_youtube_audio_url(url)
-            if not url:
-                print("Failed to get YouTube stream URL, retrying in 30 seconds...")
-                time.sleep(30)
-                continue
-
         process = subprocess.Popen(
             [
                 "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1",
                 "-reconnect_delay_max", "10", "-i", url, "-vn",
-                "-b:a", "64k", "-buffer_size", "1024k", "-f", "mp3", "-"
+                "-b:a", "64k", "-bufsize", "1024k", "-f", "mp3", "-"
             ],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=8192
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
         )
 
-        print(f"Streaming from: {url}")
+        print(f"🎵 Streaming from: {url}")
 
         try:
-            for chunk in iter(lambda: process.stdout.read(8192), b""):
+            for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
         except GeneratorExit:
-            process.kill()
+            print("❌ Client disconnected. Killing FFmpeg process...")
+            process.terminate()
+            process.wait()
             break
         except Exception as e:
             print(f"Stream error: {e}")
 
-        print("FFmpeg stopped, restarting stream...")
+        print("⚠️ FFmpeg stopped, restarting stream...")
+        process.terminate()
+        process.wait()
         time.sleep(5)
 
 @app.route("/<station_name>")
 def stream(station_name):
     """Serve the requested station as a live stream."""
-    url = YOUTUBE_STREAMS.get(station_name)
+    url = CACHE.get(station_name)
 
     if not url:
-        return "Station not found", 404
+        return "Station not found or not available", 404
 
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=False)
