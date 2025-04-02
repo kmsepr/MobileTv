@@ -20,7 +20,7 @@ def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
         command = [
-            "/opt/venv/bin/yt-dlp",  # Adjust if needed
+            "/usr/local/bin/yt-dlp", 
             "--cookies", "/mnt/data/cookies.txt",
             "--force-generic-extractor",
             "-f", "91",  # Audio format
