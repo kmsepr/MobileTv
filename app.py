@@ -75,12 +75,13 @@ def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
         process = subprocess.Popen(
-            [
-                "ffmpeg", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-                "-i", url, "-vn", "-b:a", "64k", "-bufsize", "1024k", "-f", "mp3", "-"
-            ],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
-        )
+    [
+        "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+        "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+        "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "512k", "-f", "mp3", "-"
+    ],
+    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+)
 
         logging.info(f"🎵 Streaming from: {url}")
 
