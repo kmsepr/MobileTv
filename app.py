@@ -37,7 +37,7 @@ CACHE = {}
 def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
-        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "bestaudio", "-g", youtube_url]
+        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
         
         # Check for cookie file
         if os.path.exists("/mnt/data/cookies.txt"):
@@ -56,17 +56,31 @@ def get_youtube_audio_url(youtube_url):
         return None
 
 def refresh_stream_urls():
-    """Refresh stream URLs every 60 minutes."""
+    """Refresh stream URLs — refresh skicr_tv every cycle, others every 30 minutes."""
+    last_update = {}
+
     while True:
         logging.info("🔄 Refreshing stream URLs...")
+
         for name, yt_url in YOUTUBE_STREAMS.items():
-            url = get_youtube_audio_url(yt_url)
-            if url:
-                CACHE[name] = url
-                logging.info(f"✅ Updated {name}: {url}")
-            else:
-                logging.warning(f"❌ Failed to update {name}")
-        time.sleep(1800)  # Refresh every 30 minutes
+            now = time.time()
+            refresh = False
+
+            if name == "skicr_tv":
+                refresh = True  # Always refresh skicr_tv
+            elif name not in last_update or now - last_update[name] > 1800:
+                refresh = True  # Refresh others every 30 minutes
+
+            if refresh:
+                url = get_youtube_audio_url(yt_url)
+                if url:
+                    CACHE[name] = url
+                    last_update[name] = now
+                    logging.info(f"✅ Updated {name}: {url}")
+                else:
+                    logging.warning(f"❌ Failed to update {name}")
+
+        time.sleep(60)  # Check every minute
 
 # Start the background thread for URL refreshing
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
