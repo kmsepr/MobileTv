@@ -37,7 +37,7 @@ CACHE = {}
 def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
-        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
+        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "bestaudio", "-g", youtube_url]
         
         # Check for cookie file
         if os.path.exists("/mnt/data/cookies.txt"):
