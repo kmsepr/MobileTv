@@ -55,7 +55,7 @@ def get_youtube_audio_url(youtube_url):
         return None
 
 def refresh_stream_urls():
-    """Refresh stream URLs — refresh skicr_tv every minute, others every 30 minutes."""
+    """Refresh all stream URLs every 30 minutes."""
     last_update = {}
 
     while True:
@@ -63,14 +63,7 @@ def refresh_stream_urls():
 
         for name, yt_url in YOUTUBE_STREAMS.items():
             now = time.time()
-            refresh = False
-
-            if name == "skicr_tv":
-                refresh = True  # Always refresh skicr_tv
-            elif name not in last_update or now - last_update[name] > 1800:
-                refresh = True  # Refresh others every 30 minutes
-
-            if refresh:
+            if name not in last_update or now - last_update[name] > 1800:
                 url = get_youtube_audio_url(yt_url)
                 if url:
                     CACHE[name] = url
@@ -83,7 +76,6 @@ def refresh_stream_urls():
 
 # Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
-
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
