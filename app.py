@@ -39,7 +39,6 @@ def get_youtube_audio_url(youtube_url):
     try:
         command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
         
-        # Check for cookie file
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
@@ -56,7 +55,7 @@ def get_youtube_audio_url(youtube_url):
         return None
 
 def refresh_stream_urls():
-    """Refresh stream URLs — refresh skicr_tv every cycle, others every 30 minutes."""
+    """Refresh stream URLs — refresh skicr_tv every minute, others every 30 minutes."""
     last_update = {}
 
     while True:
@@ -82,26 +81,28 @@ def refresh_stream_urls():
 
         time.sleep(60)  # Check every minute
 
-# Start the background thread for URL refreshing
+# Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
         process = subprocess.Popen(
-    [
-        "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-        "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-        "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "512k", "-f", "mp3", "-"
-    ],
-    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
-)
+            [
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+                "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "1M",
+                "-f", "mp3", "-"
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+        )
 
         logging.info(f"🎵 Streaming from: {url}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
+                time.sleep(0.02)  # Slight delay helps reduce CPU spikes and avoid buffer overrun
         except GeneratorExit:
             logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
