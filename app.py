@@ -19,14 +19,18 @@ YOUTUBE_STREAMS = {
 def get_youtube_audio_url(youtube_url):
     """Get direct audio stream URL from a non-live YouTube video."""
     try:
-        command = ["yt-dlp", "-f", "bestaudio", "-g", youtube_url]
+        command = ["yt-dlp", "-f", "140", "-g", youtube_url]  # Use a specific format code
 
+        # If cookies are available, include them in the command
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
 
+        # Run yt-dlp to get the direct audio URL
         result = subprocess.run(command, capture_output=True, text=True)
+
         if result.returncode == 0:
+            logging.info(f"yt-dlp output: {result.stdout.strip()}")
             return result.stdout.strip()
         else:
             logging.error(f"yt-dlp error: {result.stderr}")
@@ -56,9 +60,10 @@ def generate_stream(url):
     logging.info(f"Streaming from: {url}")
 
     try:
+        # Stream in chunks to the client
         for chunk in iter(lambda: process.stdout.read(4096), b""):
             yield chunk
-            time.sleep(0.02)
+            time.sleep(0.02)  # Small delay to prevent CPU overload
     except GeneratorExit:
         process.terminate()
         process.wait()
@@ -74,10 +79,12 @@ def stream(video_name):
     if not youtube_url:
         return "Video not found", 404
 
+    # Get the direct audio stream URL from YouTube
     stream_url = get_youtube_audio_url(youtube_url)
     if not stream_url:
         return "Unable to fetch stream", 500
 
+    # Return the audio stream as the response
     return Response(generate_stream(stream_url), mimetype="audio/mpeg")
 
 if __name__ == "__main__":
