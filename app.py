@@ -25,7 +25,7 @@ YOUTUBE_STREAMS = { "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
 
 CACHE = {}
 
-def get_youtube_audio_url(youtube_url): """Extracts direct audio stream URL from YouTube Live.""" try: command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
+def get_youtube_audio_url(youtube_url): """Extracts direct audio stream URL from YouTube Live.""" try: command = ["/usr/local/bin/yt-dlp", "-f", "91", "-g", youtube_url]
 
 if os.path.exists("/mnt/data/cookies.txt"):
         command.insert(2, "--cookies")
