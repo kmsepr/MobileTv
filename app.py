@@ -42,16 +42,22 @@ YOUTUBE_STREAMS = {
 CACHE = {}
 
 def get_youtube_audio_url(youtube_url):
-    """Extracts direct audio stream URL from YouTube Live."""
+    """Extracts direct audio stream URL from YouTube."""
     try:
-        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
-        
+        # Use force-generic only for live
+        is_live = "/live" in youtube_url
+
+        command = ["/usr/local/bin/yt-dlp"]
         if os.path.exists("/mnt/data/cookies.txt"):
-            command.insert(2, "--cookies")
-            command.insert(3, "/mnt/data/cookies.txt")
-        
+            command += ["--cookies", "/mnt/data/cookies.txt"]
+
+        if is_live:
+            command += ["--force-generic-extractor"]
+
+        command += ["-f", "91", "-g", youtube_url]
+
         result = subprocess.run(command, capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             return result.stdout.strip()
         else:
