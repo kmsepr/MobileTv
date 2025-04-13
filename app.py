@@ -28,9 +28,20 @@ YOUTUBE_STREAMS = {
     "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live"
-}
+    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
 
+    # Malayalam full movie channels/playlists
+    "malayalam_movies_vega": "https://www.youtube.com/c/malayalammint",
+    "biscoot_malayalam": "https://www.youtube.com/channel/UCTASgRVwSMxe3f14j3vQrMw",
+    "world_visual_media": "https://www.youtube.com/c/MalayalamFullMovies",
+    "playlist_malayalam_full_movies": "https://www.youtube.com/playlist?list=PLWvFXWNWGpSmOEsLQmaCQ9_HJcQSXos49",
+    "playlist_hit_movies_2023": "https://www.youtube.com/playlist?list=PL1mAE6a_NH3dnFoAhaZMYdubRes3CMLSz",
+    "movie_narasimham": "https://www.youtube.com/watch?v=Z3g5qGQK7eI",
+    "movie_spadikam_4k": "https://www.youtube.com/watch?v=349z-tk5RUM",
+    "movie_dhoomam": "https://www.youtube.com/watch?v=vzO9jn3hWiA",
+    "movie_salt_mango_tree": "https://www.youtube.com/watch?v=XDERdO0Wz9c",
+    "movie_kalyanaraman": "https://www.youtube.com/watch?v=e_bMbcZt9b4"
+}
 # 🌐 Cache for storing direct stream URLs
 CACHE = {}
 
