@@ -19,7 +19,7 @@ YOUTUBE_STREAMS = {
 def get_youtube_audio_url(youtube_url):
     """Get direct audio stream URL from a non-live YouTube video."""
     try:
-        command = ["/usr/local/bin/yt-dlp", "-f", "bestaudio", "-g", youtube_url]
+        command = ["yt-dlp", "-f", "bestaudio", "-g", youtube_url]
 
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
