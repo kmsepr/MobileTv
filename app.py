@@ -18,10 +18,6 @@ YOUTUBE_STREAMS = { "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
 
 # Malayalam full movie channels/playlists
 
-"movie_narasimham": "https://www.youtube.com/watch?v=Z3g5qGQK7eI",
-"movie_spadikam_4k": "https://www.youtube.com/watch?v=349z-tk5RUM",
-"movie_dhoomam": "https://www.youtube.com/watch?v=vzO9jn3hWiA",
-"movie_salt_mango_tree": "https://www.youtube.com/watch?v=XDERdO0Wz9c",
 "movie_kalyanaraman": "https://www.youtube.com/watch?v=e_bMbcZt9b4"
 
 }
