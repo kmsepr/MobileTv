@@ -1,13 +1,12 @@
+import subprocess
 import time
 import threading
 import os
 import logging
-import subprocess
 from flask import Flask, Response
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 app = Flask(__name__)
 
 # 📡 List of YouTube Live Streams
@@ -19,10 +18,10 @@ YOUTUBE_STREAMS = {
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
     "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
-    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
-    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
+    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live", 
+    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",   
+    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",  
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",  
     "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
     "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
@@ -36,22 +35,22 @@ YOUTUBE_STREAMS = {
 CACHE = {}
 
 def get_youtube_audio_url(youtube_url):
-    """Extract direct audio stream URL from YouTube Live."""
+    """Extracts direct audio stream URL from YouTube Live."""
     try:
-        command = ["/usr/local/bin/yt-dlp", "-f", "91", "-g", youtube_url]
-
+        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
+        
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
-
+        
         result = subprocess.run(command, capture_output=True, text=True)
-
+        
         if result.returncode == 0:
             return result.stdout.strip()
         else:
-            logging.error(f"yt-dlp error: {result.stderr}")
+            logging.error(f"Error extracting YouTube audio: {result.stderr}")
             return None
-    except Exception:
+    except Exception as e:
         logging.exception("Exception while extracting YouTube audio")
         return None
 
@@ -73,32 +72,21 @@ def refresh_stream_urls():
                 else:
                     logging.warning(f"❌ Failed to update {name}")
 
-        time.sleep(60)
+        time.sleep(60)  # Check every minute
 
 # Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
-
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
         process = subprocess.Popen(
             [
-                "ffmpeg",
-                "-reconnect", "1",
-                "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "10",
-                "-user_agent", "Mozilla/5.0",
-                "-i", url,
-                "-vn",
-                "-ac", "1",
-                "-b:a", "40k",
-                "-bufsize", "1M",
-                "-f", "mp3",
-                "-"
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+                "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "1M",
+                "-f", "mp3", "-"
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            bufsize=4096
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
         )
 
         logging.info(f"🎵 Streaming from: {url}")
@@ -106,7 +94,7 @@ def generate_stream(url):
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
-                time.sleep(0.02)
+                time.sleep(0.02)  # Slight delay helps reduce CPU spikes and avoid buffer overrun
         except GeneratorExit:
             logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
@@ -124,6 +112,7 @@ def generate_stream(url):
 def stream(station_name):
     """Serve the requested station as a live stream."""
     url = CACHE.get(station_name)
+
     if not url:
         return "Station not found or not available", 404
 
