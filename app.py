@@ -28,7 +28,9 @@ YOUTUBE_STREAMS = {
     "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live"
+    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
+
+"voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live"
 }
 
 # 🌐 Cache for storing direct stream URLs
