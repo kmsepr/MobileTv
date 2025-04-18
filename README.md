@@ -1,45 +1,38 @@
 
-*YouTube Live Audio Streamer*
+# YouTube Live Audio Streamer
 
-A simple Flask-based server that streams live YouTube audio as MP3 using yt-dlp and ffmpeg. Ideal for creating low-bandwidth audio streams from educational, religious, or news live channels — great for low-end devices, legacy systems, or internet radios that support only direct MP3 HTTP streams.
-
-
----
-
-Features
-
-Streams live audio from YouTube Live channels
-
-Auto-extracts audio URLs using yt-dlp
-
-Converts audio to MP3 (mono, 40 kbps) using ffmpeg
-
-Auto-refreshes links every 30 minutes
-
-Lightweight and easily deployable on services like Koyeb, Railway, etc.
-
-Optional support for cookies.txt to bypass age restrictions
-
-
+A simple Flask-based server that streams live YouTube audio as MP3 using `yt-dlp` and `ffmpeg`. Perfect for low-bandwidth audio streaming from educational, religious, or news channels — ideal for low-end devices, legacy systems, or internet radios that support only direct MP3 HTTP streams.
 
 ---
 
-Example Use
+### Features
 
-You can define channels like this in the Python code:
+- Streams live audio from YouTube Live channels
+- Auto-extracts audio URLs using `yt-dlp`
+- Converts audio to MP3 (mono, 40 kbps) using `ffmpeg`
+- Auto-refreshes links every 30 minutes
+- Lightweight and easily deployable (Koyeb, Railway, etc.)
+- Optional support for `cookies.txt` to bypass age restrictions
 
+---
+
+### Example Use
+
+You can define channels like this in your Python code:
+
+```python
 YOUTUBE_STREAMS = {
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
     ...
 }
 
-Then access the stream via:
+Then access the stream by visiting:
 
 http://your-server/skicr_tv
 http://your-server/yaqeen_institute
 
-Each endpoint returns a live MP3 audio stream from the respective YouTube Live channel.
+Each endpoint delivers a live MP3 audio stream from the corresponding YouTube Live channel.
 
 
 ---
@@ -50,30 +43,36 @@ Setup Instructions
 
 pip install flask
 
+2. Install yt-dlp and ffmpeg
 
-2. Install yt-dlp and ffmpeg Make sure they are available in your $PATH.
+Make sure both yt-dlp and ffmpeg are installed and available in your $PATH.
 
+3. (Optional) Add cookies.txt to bypass restricted content
 
-3. (Optional) Add cookies.txt to bypass restricted content:
+Place the file at:
 
-Place it at /mnt/data/cookies.txt or change the path in the script.
+/mnt/data/cookies.txt
 
-
+Or update the path inside the script to match your setup.
 
 4. Run the app
 
 python app.py
 
+The app runs by default at:
 
+http://localhost:8000
 
 
 ---
 
 Deployment Tips
 
-Works great on Koyeb, Railway, or similar platforms with persistent storage and basic Docker/Flask support.
+Runs well on Koyeb, Railway, and other platforms with Flask or Docker support
 
-Recommended to use a small mp3 bitrate (like 40 kbps mono) for smooth streaming on low-speed connections or older devices.
+Keep bitrate low (like 40 kbps mono) for stable streaming on older devices or slower connections
+
+Set up a cron or built-in timer to refresh streams every 30 minutes
 
 
 
@@ -81,6 +80,6 @@ Recommended to use a small mp3 bitrate (like 40 kbps mono) for smooth streaming 
 
 License
 
-This project is licensed under the MIT License. Feel free to modify and redistribute.
+This project is licensed under the MIT License. Feel free to modify and reuse as needed.
 
 
