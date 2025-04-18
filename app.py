@@ -94,6 +94,7 @@ def generate_stream(url):
 
 @app.route("/stream.mp3")
 def stream_mp3():
+    """Stream MP3 if available."""
     stream_url = VIDEO_CACHE.get("stream_url")
     if not stream_url:
         return "Stream not ready yet", 503
