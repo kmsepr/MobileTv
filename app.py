@@ -120,5 +120,16 @@ def stream(station_name):
 
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
+from flask import render_template_string
+
+@app.route("/")
+def index():
+    html = "<h2>🔊 Available Live Audio Streams</h2><ul>"
+    for name in YOUTUBE_STREAMS:
+        html += f'<li><a href="/{name}">{name.replace("_", " ").title()}</a></li>'
+    html += "</ul>"
+    return render_template_string(html)
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
