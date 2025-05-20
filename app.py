@@ -123,46 +123,80 @@ def stream(station_name):
 @app.route("/")
 def index():
     colors = [
-        "rgb(255, 99, 132)",   # Red
-        "rgb(54, 162, 235)",   # Blue
-        "rgb(255, 206, 86)",   # Yellow
-        "rgb(75, 192, 192)",   # Green
-        "rgb(153, 102, 255)",  # Purple
+        "#007bff",  # Bootstrap Primary Blue
+        "#28a745",  # Bootstrap Success Green
+        "#ffc107",  # Bootstrap Warning Yellow
+        "#17a2b8",  # Bootstrap Info Cyan
+        "#6f42c1",  # Purple
     ]
 
     html = """
-    <h2>🔊 Available Live Audio Streams</h2>
-    <div style="
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 15px;
-        padding: 10px;
-    ">
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Live Audio Streams</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: #f8f9fa;
+                margin: 0; padding: 20px;
+                color: #212529;
+            }
+            h2 {
+                text-align: center;
+                margin-bottom: 30px;
+                font-weight: 700;
+                color: #343a40;
+            }
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 20px;
+                max-width: 1000px;
+                margin: 0 auto;
+            }
+            .card {
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                color: white;
+                font-weight: 600;
+                font-size: 1.1rem;
+                text-decoration: none;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+                user-select: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100px;
+            }
+            .card:hover, .card:focus {
+                transform: translateY(-6px);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+                outline: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>🔊 Available Live Audio Streams</h2>
+        <div class="grid">
     """
 
     for i, name in enumerate(YOUTUBE_STREAMS):
         color = colors[i % len(colors)]
-        html += f'''
-        <a href="/{name}" style="
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: {color};
-            color: white;
-            font-weight: bold;
-            text-decoration: none;
-            border-radius: 8px;
-            height: 80px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: transform 0.2s ease;
-        " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-            {name.replace('_', ' ').title()}
-        </a>
-        '''
+        display_name = name.replace('_', ' ').title()
+        html += f'<a href="/{name}" class="card" style="background-color: {color};">{display_name}</a>'
 
-    html += "</div>"
+    html += """
+        </div>
+    </body>
+    </html>
+    """
     return render_template_string(html)
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
