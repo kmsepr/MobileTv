@@ -3,7 +3,7 @@ import time
 import threading
 import os
 import logging
-from flask import Flask, Response
+from flask import Flask, Response, render_template_string
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,8 +29,7 @@ YOUTUBE_STREAMS = {
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-
-"voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live"
+    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live"
 }
 
 # 🌐 Cache for storing direct stream URLs
@@ -40,13 +39,13 @@ def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
         command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
-        
+
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
-        
+
         result = subprocess.run(command, capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             return result.stdout.strip()
         else:
@@ -78,6 +77,7 @@ def refresh_stream_urls():
 
 # Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
+
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
@@ -120,14 +120,47 @@ def stream(station_name):
 
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
-from flask import render_template_string
-
 @app.route("/")
 def index():
-    html = "<h2>🔊 Available Live Audio Streams</h2><ul>"
-    for name in YOUTUBE_STREAMS:
-        html += f'<li><a href="/{name}">{name.replace("_", " ").title()}</a></li>'
-    html += "</ul>"
+    colors = [
+        "rgb(255, 99, 132)",   # Red
+        "rgb(54, 162, 235)",   # Blue
+        "rgb(255, 206, 86)",   # Yellow
+        "rgb(75, 192, 192)",   # Green
+        "rgb(153, 102, 255)",  # Purple
+    ]
+
+    html = """
+    <h2>🔊 Available Live Audio Streams</h2>
+    <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        padding: 10px;
+    ">
+    """
+
+    for i, name in enumerate(YOUTUBE_STREAMS):
+        color = colors[i % len(colors)]
+        html += f'''
+        <a href="/{name}" style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: {color};
+            color: white;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 8px;
+            height: 80px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease;
+        " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            {name.replace('_', ' ').title()}
+        </a>
+        '''
+
+    html += "</div>"
     return render_template_string(html)
 
 
