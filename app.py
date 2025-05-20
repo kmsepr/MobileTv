@@ -127,10 +127,6 @@ def stream(station_name):
 
 @app.route("/")
 def index():
-    colors = [
-        "#007bff", "#28a745", "#ffc107", "#17a2b8", "#6f42c1"
-    ]
-
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -141,9 +137,9 @@ def index():
         <style>
             body {
                 font-family: sans-serif;
-                background: #f8f9fa;
+                background: #ffffff;
                 margin: 0; padding: 10px;
-                color: #212529;
+                color: #000000;
             }
             h2 {
                 text-align: center;
@@ -157,12 +153,11 @@ def index():
                 justify-content: center;
             }
             .card {
-                background: white;
+                background: #f2f2f2;
                 border-radius: 10px;
                 padding: 10px;
                 text-align: center;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-                color: white;
+                color: #000000;
                 font-weight: bold;
                 font-size: 0.9rem;
                 text-decoration: none;
@@ -173,6 +168,7 @@ def index():
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                border: 1px solid #ccc;
             }
             .card:active {
                 transform: scale(0.98);
@@ -184,10 +180,9 @@ def index():
         <div class="grid">
     """
 
-    for i, name in enumerate(YOUTUBE_STREAMS):
-        color = colors[i % len(colors)]
+    for name in YOUTUBE_STREAMS:
         display_name = name.replace('_', ' ').title()
-        html += f'<a href="/{name}" class="card" style="background-color: {color};">{display_name}</a>'
+        html += f'<a href="/{name}" class="card">{display_name}</a>'
 
     html += """
         </div>
