@@ -128,11 +128,7 @@ def stream(station_name):
 @app.route("/")
 def index():
     colors = [
-        "#007bff",  # Bootstrap Primary Blue
-        "#28a745",  # Bootstrap Success Green
-        "#ffc107",  # Bootstrap Warning Yellow
-        "#17a2b8",  # Bootstrap Info Cyan
-        "#6f42c1",  # Purple
+        "#007bff", "#28a745", "#ffc107", "#17a2b8", "#6f42c1"
     ]
 
     html = """
@@ -140,54 +136,51 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <title>Live Audio Streams</title>
         <style>
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-family: sans-serif;
                 background: #f8f9fa;
-                margin: 0; padding: 20px;
+                margin: 0; padding: 10px;
                 color: #212529;
             }
             h2 {
                 text-align: center;
-                margin-bottom: 30px;
-                font-weight: 700;
-                color: #343a40;
+                margin-bottom: 20px;
+                font-size: 1.2rem;
             }
             .grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 20px;
-                max-width: 1000px;
-                margin: 0 auto;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                justify-content: center;
             }
             .card {
                 background: white;
-                border-radius: 12px;
-                padding: 20px;
+                border-radius: 10px;
+                padding: 10px;
                 text-align: center;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 6px rgba(0,0,0,0.1);
                 color: white;
-                font-weight: 600;
-                font-size: 1.1rem;
+                font-weight: bold;
+                font-size: 0.9rem;
                 text-decoration: none;
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-                user-select: none;
+                transition: transform 0.2s ease;
+                width: 100%;
+                max-width: 200px;
+                height: 60px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                height: 100px;
             }
-            .card:hover, .card:focus {
-                transform: translateY(-6px);
-                box-shadow: 0 10px 20px rgba(0,0,0,0.15);
-                outline: none;
+            .card:active {
+                transform: scale(0.98);
             }
         </style>
     </head>
     <body>
-        <h2>🔊 Available Live Audio Streams</h2>
+        <h2>🔊 Available Streams</h2>
         <div class="grid">
     """
 
