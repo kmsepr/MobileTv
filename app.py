@@ -138,7 +138,8 @@ def index():
             body {
                 font-family: sans-serif;
                 background: #ffffff;
-                margin: 0; padding: 10px;
+                margin: 0;
+                padding: 10px;
                 color: #000000;
             }
             h2 {
@@ -146,38 +147,32 @@ def index():
                 margin-bottom: 20px;
                 font-size: 1.2rem;
             }
-            .grid {
+            .list {
                 display: flex;
-                flex-wrap: wrap;
+                flex-direction: column;
                 gap: 10px;
-                justify-content: center;
+                align-items: stretch;
+                max-width: 100%;
             }
             .card {
                 background: #f2f2f2;
-                border-radius: 10px;
-                padding: 10px;
+                border-radius: 6px;
+                padding: 12px;
                 text-align: center;
                 color: #000000;
                 font-weight: bold;
-                font-size: 0.9rem;
+                font-size: 1rem;
                 text-decoration: none;
-                transition: transform 0.2s ease;
-                width: 100%;
-                max-width: 200px;
-                height: 60px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
                 border: 1px solid #ccc;
             }
             .card:active {
-                transform: scale(0.98);
+                background: #e6e6e6;
             }
         </style>
     </head>
     <body>
         <h2>🔊 Available Streams</h2>
-        <div class="grid">
+        <div class="list">
     """
 
     for name in YOUTUBE_STREAMS:
