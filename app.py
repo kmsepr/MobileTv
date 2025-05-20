@@ -83,11 +83,16 @@ def generate_stream(url):
     while True:
         process = subprocess.Popen(
             [
-                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "1", "-b:a", "24k", "-bufsize", "1M",
-                "-f", "mp3", "-"
-            ],
+    "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+    "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+    "-i", url,
+    "-vn",                   # no video
+    "-ac", "1",              # mono audio
+    "-ar", "22050",          # lower sample rate (optional for more compression)
+    "-b:a", "20k",           # reduced audio bitrate
+    "-bufsize", "64k",       # smaller buffer for low-speed links
+    "-f", "mp3", "-"
+],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
         )
 
