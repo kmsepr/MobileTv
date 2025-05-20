@@ -134,53 +134,16 @@ def index():
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <title>Live Audio Streams</title>
-        <style>
-            body {
-                font-family: sans-serif;
-                background: #ffffff;
-                margin: 0;
-                padding: 10px;
-                color: #000000;
-            }
-            h2 {
-                text-align: center;
-                margin-bottom: 20px;
-                font-size: 1.2rem;
-            }
-            .list {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                align-items: stretch;
-                max-width: 100%;
-            }
-            .card {
-                background: #f2f2f2;
-                border-radius: 6px;
-                padding: 12px;
-                text-align: center;
-                color: #000000;
-                font-weight: bold;
-                font-size: 1rem;
-                text-decoration: none;
-                border: 1px solid #ccc;
-            }
-            .card:active {
-                background: #e6e6e6;
-            }
-        </style>
     </head>
     <body>
-        <h2>🔊 Available Streams</h2>
-        <div class="list">
+        <h3>Live Streams</h3>
     """
 
     for name in YOUTUBE_STREAMS:
         display_name = name.replace('_', ' ').title()
-        html += f'<a href="/{name}" class="card">{display_name}</a>'
+        html += f'<div><a href="/{name}">{display_name}</a></div>'
 
     html += """
-        </div>
     </body>
     </html>
     """
