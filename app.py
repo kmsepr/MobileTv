@@ -11,6 +11,9 @@ app = Flask(__name__)
 
 # 📡 List of YouTube Live Streams
 YOUTUBE_STREAMS = {
+     "asianet_news": "https://www.youtube.com/@asianetnews/live",
+
+
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
