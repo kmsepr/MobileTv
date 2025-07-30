@@ -11,31 +11,16 @@ app = Flask(__name__)
 
 # 📡 List of YouTube Live Streams
 YOUTUBE_STREAMS = {
-     "asianet_news": "https://www.youtube.com/@asianetnews/live",
-
+    "asianet_news": "https://www.youtube.com/@asianetnews/live",
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
-
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
-
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
-    
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live", 
-
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",   
-
-    
-    
+    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
+    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
-   
-    
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-
-    
-    
 }
 
 # 🌐 Cache for storing direct stream URLs
@@ -57,48 +42,45 @@ def get_youtube_audio_url(youtube_url):
         else:
             logging.error(f"Error extracting YouTube audio: {result.stderr}")
             return None
-    except Exception as e:
+    except Exception:
         logging.exception("Exception while extracting YouTube audio")
         return None
 
 def refresh_stream_urls():
     """Refresh all stream URLs every 30 minutes."""
-    last_update = {}
-
     while True:
-        logging.info("🔄 Refreshing stream URLs...")
+        logging.info("🔄 Refreshing all stream URLs...")
 
         for name, yt_url in YOUTUBE_STREAMS.items():
-            now = time.time()
-            if name not in last_update or now - last_update[name] > 1800:
-                url = get_youtube_audio_url(yt_url)
-                if url:
-                    CACHE[name] = url
-                    last_update[name] = now
-                    logging.info(f"✅ Updated {name}: {url}")
-                else:
-                    logging.warning(f"❌ Failed to update {name}")
+            url = get_youtube_audio_url(yt_url)
+            if url:
+                CACHE[name] = url
+                logging.info(f"✅ Updated {name}: {url}")
+            else:
+                logging.warning(f"❌ Failed to update {name}")
 
-        time.sleep(60)  # Check every minute
+        time.sleep(1800)  # Refresh all every 30 minutes
 
 # Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 def generate_stream(url):
-    """Streams audio using FFmpeg and auto-reconnects."""
+    """Streams audio using FFmpeg and auto-restarts every 30 minutes."""
     while True:
+        start_time = time.time()
+
         process = subprocess.Popen(
             [
-    "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-    "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-    "-i", url,
-    "-vn",                   # no video
-    "-ac", "1",              # mono audio
-    "-ar", "22050",          # lower sample rate (optional for more compression)
-    "-b:a", "40k",           # reduced audio bitrate
-    "-bufsize", "64k",       # smaller buffer for low-speed links
-    "-f", "mp3", "-"
-],
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+                "-i", url,
+                "-vn",
+                "-ac", "1",
+                "-ar", "22050",
+                "-b:a", "40k",
+                "-bufsize", "64k",
+                "-f", "mp3", "-"
+            ],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
         )
 
@@ -107,7 +89,10 @@ def generate_stream(url):
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
-                time.sleep(0.02)  # Slight delay helps reduce CPU spikes and avoid buffer overrun
+                time.sleep(0.02)
+                if time.time() - start_time > 1800:
+                    logging.info("⏰ Restarting FFmpeg after 30 minutes")
+                    break
         except GeneratorExit:
             logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
@@ -125,10 +110,8 @@ def generate_stream(url):
 def stream(station_name):
     """Serve the requested station as a live stream."""
     url = CACHE.get(station_name)
-
     if not url:
         return "Station not found or not available", 404
-
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
 @app.route("/")
@@ -165,18 +148,18 @@ def index():
 <body>
     <h3>🔊 Live Audio Streams</h3>
 """
-# Dynamically build stream links
-stream_keys = list(YOUTUBE_STREAMS.keys())
-keypad_map = {}
+    # Dynamically build stream links
+    stream_keys = list(YOUTUBE_STREAMS.keys())
+    keypad_map = {}
 
-for idx, name in enumerate(stream_keys):
-    display_name = name.replace('_', ' ').title()
-    key = (idx + 1) % 10  # 1–9 and then 0 for 10th
-    html += f'<a href="/{name}">[{key}] {display_name}</a>\n'
-    keypad_map[str(key)] = name
+    for idx, name in enumerate(stream_keys):
+        display_name = name.replace('_', ' ').title()
+        key = (idx + 1) % 10  # 1–9 and then 0 for 10th
+        html += f'<a href="/{name}">[{key}] {display_name}</a>\n'
+        keypad_map[str(key)] = name
 
-# Add JavaScript for keypad mapping
-html += f"""
+    # Add JavaScript for keypad mapping
+    html += f"""
 <script>
     const streamMap = {keypad_map};
 
@@ -193,7 +176,6 @@ html += f"""
 </body>
 </html>
 """
-
     return render_template_string(html)
 
 if __name__ == "__main__":
