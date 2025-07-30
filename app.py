@@ -135,16 +135,36 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Live Audio Streams</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                font-size: 18px;
+                padding: 10px;
+                background-color: #ffffff;
+            }
+            a {
+                display: block;
+                padding: 10px;
+                margin: 5px 0;
+                color: #000000;
+                background-color: #e0e0e0;
+                text-decoration: none;
+                border: 1px solid #aaa;
+                font-weight: bold;
+            }
+            h3 {
+                font-size: 20px;
+            }
+        </style>
     </head>
     <body>
-        <h3>Live Streams</h3>
+        <h3>🔊 Live Audio Streams</h3>
     """
-
     for name in YOUTUBE_STREAMS:
         display_name = name.replace('_', ' ').title()
-        html += f'<div><a href="/{name}">{display_name}</a></div>'
+        html += f'<a href="/{name}">{display_name}</a>'
 
     html += """
     </body>
