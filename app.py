@@ -146,7 +146,7 @@ def index():
     </style>
 </head>
 <body>
-    <h3>🔊 Live Audio Streams</h3>
+    <h3>🔊 YouTube Live </h3>
 """
     # Dynamically build stream links
     stream_keys = list(YOUTUBE_STREAMS.keys())
