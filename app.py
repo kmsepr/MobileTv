@@ -13,26 +13,29 @@ app = Flask(__name__)
 YOUTUBE_STREAMS = {
      "asianet_news": "https://www.youtube.com/@asianetnews/live",
 
-
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
+
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
+
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
+
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
-    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
-    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
+    
     "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live", 
+
     "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",   
-    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",  
-    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",  
-    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
+
+    
+    
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
-    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
-    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
-    "entri_app": "https://www.youtube.com/@entriapp/live",
+   
+    
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live"
+
+    
+    
 }
 
 # 🌐 Cache for storing direct stream URLs
@@ -131,45 +134,66 @@ def stream(station_name):
 @app.route("/")
 def index():
     html = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Live Audio Streams</title>
-        <style>
-            body {
-                font-family: sans-serif;
-                font-size: 18px;
-                padding: 10px;
-                background-color: #ffffff;
-            }
-            a {
-                display: block;
-                padding: 10px;
-                margin: 5px 0;
-                color: #000000;
-                background-color: #e0e0e0;
-                text-decoration: none;
-                border: 1px solid #aaa;
-                font-weight: bold;
-            }
-            h3 {
-                font-size: 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <h3>🔊 Live Audio Streams</h3>
-    """
-    for name in YOUTUBE_STREAMS:
-        display_name = name.replace('_', ' ').title()
-        html += f'<a href="/{name}">{display_name}</a>'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Live Audio Streams</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            font-size: 18px;
+            padding: 10px;
+            background-color: #ffffff;
+        }
+        a {
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            color: #000000;
+            background-color: #e0e0e0;
+            text-decoration: none;
+            border: 1px solid #aaa;
+            font-weight: bold;
+        }
+        h3 {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h3>🔊 Live Audio Streams</h3>
+"""
+# Dynamically build stream links
+stream_keys = list(YOUTUBE_STREAMS.keys())
+keypad_map = {}
 
-    html += """
-    </body>
-    </html>
-    """
+for idx, name in enumerate(stream_keys):
+    display_name = name.replace('_', ' ').title()
+    key = (idx + 1) % 10  # 1–9 and then 0 for 10th
+    html += f'<a href="/{name}">[{key}] {display_name}</a>\n'
+    keypad_map[str(key)] = name
+
+# Add JavaScript for keypad mapping
+html += f"""
+<script>
+    const streamMap = {keypad_map};
+
+    document.addEventListener("keydown", function(e) {{
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+        const key = e.key;
+        if (key in streamMap) {{
+            window.location.href = '/' + streamMap[key];
+        }}
+    }});
+</script>
+
+</body>
+</html>
+"""
+
     return render_template_string(html)
 
 if __name__ == "__main__":
