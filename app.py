@@ -95,12 +95,77 @@ def generate_stream(url):
         logging.warning("⚠️ FFmpeg process ended, restarting in 5s...")
         time.sleep(5)
 
+@app.route("/stream/<station_name>")
+def stream_audio(station_name):
+    data = CACHE.get(station_name)
+    if not data or not data.get("url"):
+        return "Stream not available", 404
+    return Response(generate_stream(data["url"]), mimetype="audio/mpeg")
+
 @app.route("/<station_name>")
-def stream(station_name):
+def stream_page(station_name):
     data = CACHE.get(station_name)
     if not data or not data.get("url"):
         return "Station not found or not live", 404
-    return Response(generate_stream(data["url"]), mimetype="audio/mpeg")
+
+    display_name = station_name.replace("_", " ").title()
+    stream_url = f"/stream/{station_name}"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{display_name}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                font-family: sans-serif;
+                text-align: center;
+                background: #fff;
+                padding: 20px;
+            }}
+            audio {{
+                width: 100%;
+                margin-top: 20px;
+            }}
+            h2 {{
+                font-size: 24px;
+                margin-bottom: 10px;
+            }}
+            .info {{
+                margin: 10px 0;
+                color: #555;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>🎧 Now Playing</h2>
+        <div class="info"><strong>{display_name}</strong></div>
+        <audio id="player" controls autoplay>
+            <source id="audioSource" src="{stream_url}" type="audio/mpeg">
+            Your browser does not support audio.
+        </audio>
+        <div class="info">Stream will auto-retry if interrupted</div>
+
+        <script>
+            const player = document.getElementById("player");
+            const source = document.getElementById("audioSource");
+
+            player.addEventListener("error", function() {{
+                console.warn("Stream error detected. Retrying in 2s...");
+                setTimeout(() => {{
+                    const newSrc = source.src.split("?")[0] + "?retry=" + Date.now();
+                    source.src = newSrc;
+                    player.load();
+                    player.play().catch(err => console.warn("Autoplay failed:", err));
+                }}, 2000);
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
 
 @app.route("/")
 def index():
