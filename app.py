@@ -16,9 +16,9 @@ YOUTUBE_STREAMS = {
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
+    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
+    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
 }
@@ -27,7 +27,7 @@ YOUTUBE_STREAMS = {
 CACHE = {}
 
 def get_youtube_audio_url(youtube_url):
-    """Extract direct audio stream URL."""
+    """Extract direct audio stream URL using yt-dlp."""
     try:
         command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
         if os.path.exists("/mnt/data/cookies.txt"):
@@ -169,7 +169,11 @@ def stream_page(station_name):
 
 @app.route("/")
 def index():
-    stream_keys = list(YOUTUBE_STREAMS.keys())
+    stream_keys = sorted(
+        YOUTUBE_STREAMS.keys(),
+        key=lambda name: (not CACHE.get(name, {}).get("live", False), name)
+    )
+
     keypad_map = {}
     html = """
 <!DOCTYPE html>
