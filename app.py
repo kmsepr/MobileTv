@@ -143,29 +143,46 @@ def index():
         h3 {
             font-size: 20px;
         }
+        .live-badge {
+            background-color: red;
+            color: white;
+            font-size: 12px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <h3>🔊 YouTube Live </h3>
+    <h3>🔊 YouTube Live</h3>
 """
-    # Dynamically build stream links
-    stream_keys = list(YOUTUBE_STREAMS.keys())
-    keypad_map = {}
 
-    for idx, name in enumerate(stream_keys):
+    # Separate live & non-live
+    live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if "youtube.com" in v}
+    other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if "youtube.com" not in v}
+
+    # Sort both lists alphabetically by name
+    sorted_live = sorted(live_channels.keys())
+    sorted_other = sorted(other_channels.keys())
+
+    # Combine so live channels come first
+    sorted_keys = sorted_live + sorted_other
+
+    keypad_map = {}
+    for idx, name in enumerate(sorted_keys):
         display_name = name.replace('_', ' ').title()
-        key = (idx + 1) % 10  # 1–9 and then 0 for 10th
-        html += f'<a href="/{name}">[{key}] {display_name}</a>\n'
+        key = (idx + 1) % 10  # 1–9, then 0
+        badge = '<span class="live-badge">LIVE</span>' if name in live_channels else ''
+        html += f'<a href="/{name}">[{key}] {display_name} {badge}</a>\n'
         keypad_map[str(key)] = name
 
-    # Add JavaScript for keypad mapping
     html += f"""
 <script>
     const streamMap = {keypad_map};
 
     document.addEventListener("keydown", function(e) {{
         if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-
         const key = e.key;
         if (key in streamMap) {{
             window.location.href = '/' + streamMap[key];
@@ -177,6 +194,5 @@ def index():
 </html>
 """
     return render_template_string(html)
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
