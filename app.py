@@ -158,21 +158,21 @@ def index():
     <h3>🔊 YouTube Live</h3>
 """
 
-    # Separate live & non-live
-    live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if "youtube.com" in v}
-    other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if "youtube.com" not in v}
+    # Live channels are those with a working cached URL
+    live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
+    other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
 
-    # Sort both lists alphabetically by name
+    # Sort both alphabetically
     sorted_live = sorted(live_channels.keys())
     sorted_other = sorted(other_channels.keys())
 
-    # Combine so live channels come first
+    # Merge so live are on top
     sorted_keys = sorted_live + sorted_other
 
     keypad_map = {}
     for idx, name in enumerate(sorted_keys):
         display_name = name.replace('_', ' ').title()
-        key = (idx + 1) % 10  # 1–9, then 0
+        key = (idx + 1) % 10  # 1–9 then 0
         badge = '<span class="live-badge">LIVE</span>' if name in live_channels else ''
         html += f'<a href="/{name}">[{key}] {display_name} {badge}</a>\n'
         keypad_map[str(key)] = name
