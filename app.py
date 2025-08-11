@@ -70,20 +70,16 @@ def generate_stream(url):
         start_time = time.time()
 
         process = subprocess.Popen([
-    "ffmpeg",
-    "-reconnect", "1",
-    "-reconnect_streamed", "1",
-    "-reconnect_delay_max", "30",
-    "-timeout", "10000000",
-    "-user_agent", "Mozilla/5.0",
-    "-i", url,
-    "-vn",
-    "-ac", "1",
-    "-ar", "16000",
-    "-b:a", "20k",
-    "-bufsize", "32k",
-    "-f", "mp3", "-"
-], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
+"ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "30",
+"-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+"-i", url,
+"-vn",
+"-ac", "1",
+"-ar", "22050",
+"-b:a", "32k",
+"-bufsize", "64k",
+"-f", "mp3", "-"
+],stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
 
         logging.info(f"🎵 Streaming from: {url}")
 
