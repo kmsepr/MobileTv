@@ -5,6 +5,7 @@ import os
 import logging
 from flask import Flask, Response, render_template_string
 
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 app = Flask(__name__)
 
@@ -22,17 +23,20 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
 }
 
+# 🌐 Cache for storing direct stream URLs
 CACHE = {}
 
 def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
         command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
+
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
 
         result = subprocess.run(command, capture_output=True, text=True)
+
         if result.returncode == 0:
             return result.stdout.strip()
         else:
@@ -46,6 +50,7 @@ def refresh_stream_urls():
     """Refresh all stream URLs every 30 minutes."""
     while True:
         logging.info("🔄 Refreshing all stream URLs...")
+
         for name, yt_url in YOUTUBE_STREAMS.items():
             url = get_youtube_audio_url(yt_url)
             if url:
@@ -53,52 +58,50 @@ def refresh_stream_urls():
                 logging.info(f"✅ Updated {name}: {url}")
             else:
                 logging.warning(f"❌ Failed to update {name}")
-        time.sleep(1800)
 
+        time.sleep(1800)  # Refresh all every 30 minutes
+
+# Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 def generate_stream(url):
-    """Streams audio using FFmpeg, restarts instantly if it crashes/drops."""
+    """Streams audio using FFmpeg and auto-restarts every 30 minutes."""
     while True:
+        start_time = time.time()
+
         process = subprocess.Popen([
-            "ffmpeg",
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_delay_max", "10",
-            "-reconnect_at_eof", "1",
-            "-rw_timeout", "15000000",  # 15 seconds
-            "-probesize", "64k",
-            "-analyzeduration", "500000",  # 0.5s
-            "-user_agent", "Mozilla/5.0",
-            "-i", url,
-            "-vn", "-ac", "1", "-b:a", "24k", "-bufsize", "64k",
-            "-f", "mp3", "-"
-        ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+                "-probesize", "64k", "-analyzeduration", "500000",  # 🔹 Small startup buffer tweak
+                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+                "-i", url, "-vn", "-ac", "1", "-b:a", "24k", "-bufsize", "64k",
+                "-f", "mp3", "-"
+            ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
 
         logging.info(f"🎵 Streaming from: {url}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
+                time.sleep(0.02)
+                if time.time() - start_time > 1800:
+                    logging.info("⏰ Restarting FFmpeg after 30 minutes")
+                    break
         except GeneratorExit:
-            logging.info("❌ Client disconnected. Stopping FFmpeg...")
+            logging.info("❌ Client disconnected. Stopping FFmpeg process...")
+            process.terminate()
+            process.wait()
             break
         except Exception as e:
             logging.error(f"Stream error: {e}")
 
-        # Clean up process
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-
-        logging.warning("⚠️ FFmpeg stopped, restarting stream in 2s...")
-        time.sleep(2)  # Prevent rapid restart loop
+        logging.warning("⚠️ FFmpeg stopped, restarting stream...")
+        process.terminate()
+        process.wait()
+        time.sleep(5)
 
 @app.route("/<station_name>")
 def stream(station_name):
+    """Serve the requested station as a live stream."""
     url = CACHE.get(station_name)
     if not url:
         return "Station not found or not available", 404
@@ -107,16 +110,82 @@ def stream(station_name):
 @app.route("/")
 def index():
     html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Live Audio Streams</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            font-size: 18px;
+            padding: 10px;
+            background-color: #ffffff;
+        }
+        a {
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            color: #000000;
+            background-color: #e0e0e0;
+            text-decoration: none;
+            border: 1px solid #aaa;
+            font-weight: bold;
+        }
+        h3 {
+            font-size: 20px;
+        }
+        .live-badge {
+            background-color: red;
+            color: white;
+            font-size: 12px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
     <h3>🔊 YouTube Live</h3>
-    """
+"""
+
+    # Live channels are those with a working cached URL
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
+    other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
+
+    # Sort both alphabetically
     sorted_live = sorted(live_channels.keys())
-    sorted_other = sorted(set(YOUTUBE_STREAMS.keys()) - set(live_channels.keys()))
+    sorted_other = sorted(other_channels.keys())
+
+    # Merge so live are on top
     sorted_keys = sorted_live + sorted_other
+
+    keypad_map = {}
     for idx, name in enumerate(sorted_keys):
         display_name = name.replace('_', ' ').title()
-        badge = '<span style="color:white;background:red;padding:2px 4px;">LIVE</span>' if name in live_channels else ''
-        html += f'<a href="/{name}">{display_name} {badge}</a><br>'
+        key = (idx + 1) % 10  # 1–9 then 0
+        badge = '<span class="live-badge">LIVE</span>' if name in live_channels else ''
+        html += f'<a href="/{name}">[{key}] {display_name} {badge}</a>\n'
+        keypad_map[str(key)] = name
+
+    html += f"""
+<script>
+    const streamMap = {keypad_map};
+
+    document.addEventListener("keydown", function(e) {{
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        const key = e.key;
+        if (key in streamMap) {{
+            window.location.href = '/' + streamMap[key];
+        }}
+    }});
+</script>
+
+</body>
+</html>
+"""
     return render_template_string(html)
 
 if __name__ == "__main__":
