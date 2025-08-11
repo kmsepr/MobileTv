@@ -77,7 +77,7 @@ def generate_stream(url):
                 "-vn",
                 "-ac", "1",
                 "-ar", "22050",
-                "-b:a", "32k",
+                "-b:a", "24k",
                 "-bufsize", "64k",
                 "-f", "mp3", "-"
             ],
