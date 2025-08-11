@@ -71,13 +71,13 @@ def generate_stream(url):
 
         process = subprocess.Popen(
             [
-                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "30",
                 "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
                 "-i", url,
                 "-vn",
                 "-ac", "1",
                 "-ar", "22050",
-                "-b:a", "24k",
+                "-b:a", "32k",
                 "-bufsize", "64k",
                 "-f", "mp3", "-"
             ],
