@@ -40,7 +40,7 @@ def get_youtube_audio_url(youtube_url):
         if result.returncode == 0:
             return result.stdout.strip()
         else:
-            logging.error(f"Error extracting YouTube audio: {result.stderr}")
+            logging.error(f"Error extracting YouTube audio: {result.stderr.strip()}")
             return None
     except Exception:
         logging.exception("Exception while extracting YouTube audio")
@@ -59,44 +59,77 @@ def refresh_stream_urls():
             else:
                 logging.warning(f"❌ Failed to update {name}")
 
-        time.sleep(1800)  # Refresh all every 30 minutes
+        time.sleep(1800)  # Refresh every 30 minutes
 
 # Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
+
+def safe_terminate_process(process):
+    """Try to terminate process gracefully, then kill if needed."""
+    if process.poll() is None:  # Still running
+        logging.info("Terminating ffmpeg process...")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+            logging.info("FFmpeg process terminated gracefully.")
+        except subprocess.TimeoutExpired:
+            logging.warning("FFmpeg process did not terminate in time, killing...")
+            process.kill()
+            process.wait()
+            logging.info("FFmpeg process killed.")
 
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-restarts every 30 minutes."""
     while True:
         start_time = time.time()
 
+        logging.info(f"Starting FFmpeg stream from: {url}")
         process = subprocess.Popen([
-                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-                "-probesize", "64k", "-analyzeduration", "500000",  # 🔹 Small startup buffer tweak
-                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "1", "-b:a", "24k", "-bufsize", "64k",
-                "-f", "mp3", "-"
-            ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
-
-        logging.info(f"🎵 Streaming from: {url}")
+                "ffmpeg",
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10",
+                "-probesize", "64k",
+                "-analyzeduration", "500000",  # 0.5 sec analyze duration
+                "-timeout", "5000000",
+                "-user_agent", "Mozilla/5.0",
+                "-i", url,
+                "-vn",
+                "-ac", "1",
+                "-b:a", "24k",   # Low bitrate for slow connections
+                "-bufsize", "64k",
+                "-f", "mp3",
+                "-"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=8192  # read chunks in 8 KB blocks
+        )
 
         try:
-            for chunk in iter(lambda: process.stdout.read(4096), b""):
+            while True:
+                chunk = process.stdout.read(8192)
+                if not chunk:
+                    # Stream ended unexpectedly
+                    logging.warning("FFmpeg stdout closed, restarting stream...")
+                    break
                 yield chunk
-                time.sleep(0.02)
-                if time.time() - start_time > 1800:
+
+                if time.time() - start_time > 1800:  # Restart every 30 mins
                     logging.info("⏰ Restarting FFmpeg after 30 minutes")
                     break
+
+                time.sleep(0.02)  # small throttle to avoid busy loop
         except GeneratorExit:
-            logging.info("❌ Client disconnected. Stopping FFmpeg process...")
-            process.terminate()
-            process.wait()
+            logging.info("❌ Client disconnected, terminating FFmpeg...")
+            safe_terminate_process(process)
             break
         except Exception as e:
             logging.error(f"Stream error: {e}")
+            safe_terminate_process(process)
 
-        logging.warning("⚠️ FFmpeg stopped, restarting stream...")
-        process.terminate()
-        process.wait()
+        logging.warning("⚠️ FFmpeg stopped, restarting stream in 5s...")
+        safe_terminate_process(process)
         time.sleep(5)
 
 @app.route("/<station_name>")
@@ -151,21 +184,18 @@ def index():
     <h3>🔊 YouTube Live</h3>
 """
 
-    # Live channels are those with a working cached URL
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
     other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
 
-    # Sort both alphabetically
     sorted_live = sorted(live_channels.keys())
     sorted_other = sorted(other_channels.keys())
 
-    # Merge so live are on top
     sorted_keys = sorted_live + sorted_other
 
     keypad_map = {}
     for idx, name in enumerate(sorted_keys):
         display_name = name.replace('_', ' ').title()
-        key = (idx + 1) % 10  # 1–9 then 0
+        key = (idx + 1) % 10  # 1-9 then 0
         badge = '<span class="live-badge">LIVE</span>' if name in live_channels else ''
         html += f'<a href="/{name}">[{key}] {display_name} {badge}</a>\n'
         keypad_map[str(key)] = name
