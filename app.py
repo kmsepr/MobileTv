@@ -16,7 +16,7 @@ YOUTUBE_STREAMS = {
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
+    "entri_app": "https://www.youtube.com/@entriapp",
     "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
     "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
