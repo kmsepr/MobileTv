@@ -18,7 +18,7 @@ YOUTUBE_STREAMS = {
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "entri_app": "https://www.youtube.com/@entriapp",
     "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
+    "xylem_sslc": "https://www.youtube.com/XylemSSLC2023",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
 }
