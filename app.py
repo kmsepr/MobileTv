@@ -1,4 +1,4 @@
-import subprocess
+ik4port subprocess
 import time
 import threading
 import os
@@ -96,7 +96,7 @@ def generate_stream(url):
                 "-i", url,
                 "-vn",
                 "-ac", "1",
-                "-b:a", "16k",   # Low bitrate for slow connections
+                "-b:a", "6k",   # Low bitrate for slow connections
                 "-bufsize", "64k",
                 "-f", "mp3",
                 "-"
