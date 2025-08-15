@@ -96,7 +96,7 @@ def generate_stream(url):
                 "-i", url,
                 "-vn",
                 "-ac", "1",
-                "-b:a", "6k",   # Low bitrate for slow connections
+                "-b:a", "56k",   # Low bitrate for slow connections
                 "-bufsize", "64k",
                 "-f", "mp3",
                 "-"
