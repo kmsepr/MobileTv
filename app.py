@@ -79,58 +79,42 @@ def safe_terminate_process(process):
             logging.info("FFmpeg process killed.")
 
 def generate_stream(url):
-    """Streams audio using FFmpeg and auto-restarts every 30 minutes."""
+    """Streams audio using FFmpeg and auto-restarts on error."""
     while True:
-        start_time = time.time()
+        logging.info(f"🎵 Starting FFmpeg stream from: {url}")
 
-        logging.info(f"Starting FFmpeg stream from: {url}")
         process = subprocess.Popen([
                 "ffmpeg",
                 "-reconnect", "1",
                 "-reconnect_streamed", "1",
                 "-reconnect_delay_max", "10",
-                "-probesize", "64k",
-                "-analyzeduration", "500000",  # 0.5 sec analyze duration
-                "-timeout", "5000000",
                 "-user_agent", "Mozilla/5.0",
                 "-i", url,
                 "-vn",
                 "-ac", "1",
-                "-b:a", "24k",   # Low bitrate for slow connections
-                "-bufsize", "64k",
+                "-ar", "22050",   # downsample for lighter playback
+                "-b:a", "24k",   # stable low bitrate
                 "-f", "mp3",
                 "-"
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            bufsize=8192  # read chunks in 8 KB blocks
+            bufsize=4096
         )
 
         try:
-            while True:
-                chunk = process.stdout.read(8192)
-                if not chunk:
-                    # Stream ended unexpectedly
-                    logging.warning("FFmpeg stdout closed, restarting stream...")
-                    break
+            for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
-
-                if time.time() - start_time > 1800:  # Restart every 30 mins
-                    logging.info("⏰ Restarting FFmpeg after 30 minutes")
-                    break
-
-                time.sleep(0.02)  # small throttle to avoid busy loop
         except GeneratorExit:
-            logging.info("❌ Client disconnected, terminating FFmpeg...")
-            safe_terminate_process(process)
+            logging.info("❌ Client disconnected, killing FFmpeg...")
+            process.kill()
             break
         except Exception as e:
-            logging.error(f"Stream error: {e}")
-            safe_terminate_process(process)
-
-        logging.warning("⚠️ FFmpeg stopped, restarting stream in 5s...")
-        safe_terminate_process(process)
-        time.sleep(5)
+            logging.error(f"⚠️ Stream error: {e}")
+        finally:
+            process.kill()
+            logging.warning("🔁 Restarting FFmpeg in 5s...")
+            time.sleep(5)
 
 @app.route("/<station_name>")
 def stream(station_name):
