@@ -83,7 +83,7 @@ def generate_stream(url):
     while True:
         logging.info(f"🎵 Starting FFmpeg stream from: {url}")
 
-                process = subprocess.Popen(
+        process = subprocess.Popen(
             [
                 "ffmpeg",
                 "-reconnect", "1",
@@ -92,13 +92,13 @@ def generate_stream(url):
                 "-i", url,
                 "-vn",
                 "-ac", "1",
-                "-b:a", "24k",  # a bit higher bitrate, more stable
+                "-b:a", "24k",  # stable low bitrate
                 "-f", "mp3",
                 "-"
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            bufsize=4096   # moderate buffer
+            bufsize=4096
         )
 
         try:
@@ -106,12 +106,12 @@ def generate_stream(url):
                 yield chunk
         except GeneratorExit:
             logging.info("❌ Client disconnected, killing FFmpeg...")
-            process.kill()
+            safe_terminate_process(process)
             break
         except Exception as e:
             logging.error(f"⚠️ Stream error: {e}")
         finally:
-            process.kill()
+            safe_terminate_process(process)
             logging.warning("🔁 Restarting FFmpeg in 5s...")
             time.sleep(5)
 
