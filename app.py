@@ -76,7 +76,7 @@ def generate_stream(url, high_quality=False):
             "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
             "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
             "-i", url, "-vn",
-            "-ac", "2", "-ar", "44100", "-b:a", "48k",
+            "-ac", "2", "-ar", "44100", "-b:a", "64k",
             "-bufsize", "1M", "-f", "mp3", "-"
         ]
     else:
@@ -84,7 +84,7 @@ def generate_stream(url, high_quality=False):
             "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
             "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
             "-i", url, "-vn",
-            "-ac", "1", "-ar", "16000", "-b:a", "16k",
+            "-ac", "1", "-ar", "16000", "-b:a", "24k",
             "-bufsize", "512k", "-f", "mp3", "-"
         ]
 
