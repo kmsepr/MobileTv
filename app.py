@@ -143,13 +143,15 @@ def stream(station_name):
 # -----------------------
 @app.route("/")
 def index():
+    # Separate live and offline channels
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
-    other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
-    sorted_live = sorted(live_channels.keys())
-    sorted_other = sorted(other_channels.keys())
-    all_keys = sorted_live + sorted_other
+    offline_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
 
-    keypad_map = {}
+    # Sort by name
+    sorted_live = sorted(live_channels.keys())
+    sorted_offline = sorted(offline_channels.keys())
+    all_keys = sorted_live + sorted_offline
+
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -168,26 +170,13 @@ def index():
       <h3>🎵 YouTube Live Audio Streams</h3>
     """
 
+    # Render live channels first
     for idx, name in enumerate(all_keys, 1):
-        live = " <span class='live'>LIVE</span>" if name in live_channels else ""
+        live_badge = " <span class='live'>LIVE</span>" if name in live_channels else ""
         display_name = name.replace("_", " ").title()
-        html += f"<a href='/{name}'>{idx}. {display_name}{live}</a>\n"
-        key = idx % 10
-        keypad_map[str(key)] = name
+        html += f"<a href='/{name}'>{idx}. {display_name}{live_badge}</a>\n"
 
-    html += f"""
-    <script>
-    const streamMap = {keypad_map};
-    document.addEventListener("keydown", function(e) {{
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-        const key = e.key;
-        if (key in streamMap) {{
-            window.location.href = '/' + streamMap[key];
-        }}
-    }});
-    </script>
-    </body></html>
-    """
+    html += "</body></html>"
     return render_template_string(html)
 
 # -----------------------
