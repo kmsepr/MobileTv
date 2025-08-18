@@ -78,8 +78,7 @@ def safe_terminate_process(process):
             process.wait()
             logging.info("FFmpeg process killed.")
 
-# Start background thread
-threading.Thread(target=refresh_stream_urls, daemon=True).start()
+
 def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
