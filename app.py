@@ -3,7 +3,7 @@ import time
 import threading
 import os
 import logging
-from flask import Flask, Response, render_template_string
+from flask import Flask, Response, render_template_string, request
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -79,25 +79,35 @@ def safe_terminate_process(process):
             logging.info("FFmpeg process killed.")
 
 
-def generate_stream(url):
+def generate_stream(url, high_quality=False):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
-        process = subprocess.Popen(
-            [
-                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+        if high_quality:
+            ffmpeg_cmd = [
+                "ffmpeg", "-reconnect", "1", "-reconnect_delay_max", "5",
                 "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "1", "-b:a", "24k", "-bufsize", "1M",
-                "-f", "mp3", "-"
-            ],
+                "-i", url, "-vn", "-ac", "2", "-ar", "44100", "-b:a", "48k",
+                "-bufsize", "512k", "-f", "mp3", "-"
+            ]
+        else:
+            ffmpeg_cmd = [
+                "ffmpeg", "-reconnect", "1", "-reconnect_delay_max", "5",
+                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+                "-i", url, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "16k",
+                "-bufsize", "256k", "-f", "mp3", "-"
+            ]
+
+        process = subprocess.Popen(
+            ffmpeg_cmd,
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
         )
 
-        logging.info(f"🎵 Streaming from: {url}")
+        logging.info(f"🎵 Streaming from: {url} ({'HIGH' if high_quality else 'LOW'})")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
-                time.sleep(0.02)  # Slight delay helps reduce CPU spikes and avoid buffer overrun
+                time.sleep(0.01)  # smoother streaming on weak networks
         except GeneratorExit:
             logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
@@ -117,7 +127,9 @@ def stream(station_name):
     url = CACHE.get(station_name)
     if not url:
         return "Station not found or not available", 404
-    return Response(generate_stream(url), mimetype="audio/mpeg")
+
+    high_quality = "high" in request.args
+    return Response(generate_stream(url, high_quality=high_quality), mimetype="audio/mpeg")
 
 @app.route("/")
 def index():
@@ -160,7 +172,7 @@ def index():
     </style>
 </head>
 <body>
-    <h3>🔊 YouTube Live</h3>
+    <h3>🔊 YouTube Live (Low-Speed Friendly)</h3>
 """
 
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
@@ -177,6 +189,7 @@ def index():
         key = (idx + 1) % 10  # 1-9 then 0
         badge = '<span class="live-badge">LIVE</span>' if name in live_channels else ''
         html += f'<a href="/{name}">[{key}] {display_name} {badge}</a>\n'
+        html += f'<a href="/{name}?high" style="margin-left:20px;font-size:14px;">↳ High Quality</a>\n'
         keypad_map[str(key)] = name
 
     html += f"""
