@@ -165,11 +165,27 @@ def index():
       <h3>🎵 Currently Live Streams</h3>
     """
 
+    # JS keypad map
+    keypad_map = {}
     for idx, name in enumerate(sorted_live, 1):
         display_name = name.replace("_", " ").title()
         html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
+        key = str(idx % 10)  # 1-9, 0
+        keypad_map[key] = name
 
-    html += "</body></html>"
+    html += f"""
+    <script>
+    const streamMap = {keypad_map};
+    document.addEventListener("keydown", function(e) {{
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        const key = e.key;
+        if (key in streamMap) {{
+            window.location.href = '/' + streamMap[key];
+        }}
+    }});
+    </script>
+    </body></html>
+    """
     return render_template_string(html)
 
 # -----------------------
