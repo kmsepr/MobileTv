@@ -143,14 +143,9 @@ def stream(station_name):
 # -----------------------
 @app.route("/")
 def index():
-    # Separate live and offline channels
+    # Only show channels with active stream URLs
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
-    offline_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
-
-    # Sort by name
     sorted_live = sorted(live_channels.keys())
-    sorted_offline = sorted(offline_channels.keys())
-    all_keys = sorted_live + sorted_offline
 
     html = """
     <!DOCTYPE html>
@@ -167,14 +162,12 @@ def index():
       </style>
     </head>
     <body>
-      <h3>🎵 YouTube Live Audio Streams</h3>
+      <h3>🎵 Currently Live Streams</h3>
     """
 
-    # Render live channels first
-    for idx, name in enumerate(all_keys, 1):
-        live_badge = " <span class='live'>LIVE</span>" if name in live_channels else ""
+    for idx, name in enumerate(sorted_live, 1):
         display_name = name.replace("_", " ").title()
-        html += f"<a href='/{name}'>{idx}. {display_name}{live_badge}</a>\n"
+        html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
 
     html += "</body></html>"
     return render_template_string(html)
