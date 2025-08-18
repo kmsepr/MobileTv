@@ -3,7 +3,7 @@ import time
 import threading
 import os
 import logging
-from flask import Flask, Response, render_template_string, request
+from flask import Flask, Response, render_template_string
 from collections import deque
 
 # -----------------------
@@ -84,36 +84,29 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Stream generator with auto-reconnect
+# Stream generator
 # -----------------------
-def generate_stream(station_name, high_quality=False):
+def generate_stream(station_name):
     """Yield MP3 chunks using FFmpeg with reconnect."""
+    url = CACHE.get(station_name)
+    if not url:
+        logging.warning(f"No cached URL for {station_name}")
+        return
+
     buffer = deque(maxlen=2000)  # ~2 min buffer
 
     while True:
-        url = CACHE.get(station_name)
-        if not url:
-            logging.warning(f"No cached URL for {station_name}, retrying...")
-            time.sleep(5)
-            continue
-
-        if high_quality:
-            cmd = [
+        process = subprocess.Popen(
+            [
                 "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
                 "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "2", "-ar", "44100", "-b:a", "48k", "-bufsize", "2M",
+                "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "1M",
                 "-f", "mp3", "-"
-            ]
-        else:
-            cmd = [
-                "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
-                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "1", "-ar", "22050", "-b:a", "24k", "-bufsize", "1M",
-                "-f", "mp3", "-"
-            ]
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+        )
 
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
-        logging.info(f"🎵 Streaming {station_name} ({'HQ' if high_quality else 'LQ'})")
+        logging.info(f"🎵 Streaming {station_name}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
@@ -143,22 +136,19 @@ def stream(station_name):
     url = CACHE.get(station_name)
     if not url:
         return "Station not found or not available", 404
-    high_quality = "high" in request.args
-    return Response(generate_stream(station_name, high_quality=high_quality), mimetype="audio/mpeg")
+    return Response(generate_stream(station_name), mimetype="audio/mpeg")
 
 # -----------------------
 # Homepage
 # -----------------------
 @app.route("/")
 def index():
-    # Separate live and offline channels
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
     other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
     sorted_live = sorted(live_channels.keys())
     sorted_other = sorted(other_channels.keys())
     all_keys = sorted_live + sorted_other
 
-    # Keypad mapping for T9-style shortcuts
     keypad_map = {}
     html = """
     <!DOCTYPE html>
@@ -182,8 +172,7 @@ def index():
         live = " <span class='live'>LIVE</span>" if name in live_channels else ""
         display_name = name.replace("_", " ").title()
         html += f"<a href='/{name}'>{idx}. {display_name}{live}</a>\n"
-        html += f"<a href='/{name}?high' style='margin-left:20px;font-size:14px;'>↳ High Quality</a>\n"
-        key = idx % 10  # 1-9 then 0
+        key = idx % 10
         keypad_map[str(key)] = name
 
     html += f"""
