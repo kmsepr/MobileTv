@@ -3,7 +3,8 @@ import time
 import threading
 import os
 import logging
-from flask import Flask, Response
+from flask import Flask, Response, render_template_string
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -82,10 +83,10 @@ def generate_stream(url):
     """Streams audio using FFmpeg and auto-reconnects."""
     while True:
         process = subprocess.Popen(
-            [
+           [
                 "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
                 "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "1M",
+                "-i", url, "-vn", "-ac", "2", "-b:a", "48k", "-bufsize", "1M",
                 "-f", "mp3", "-"
             ],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
@@ -119,6 +120,38 @@ def stream(station_name):
         return "Station not found or not available", 404
 
     return Response(generate_stream(url), mimetype="audio/mpeg")
+
+
+@app.route("/")
+def index():
+    html = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>YouTube Live Audio Streams</title>
+      <style>
+        body { font-family: sans-serif; padding: 10px; }
+        a { display: block; margin: 5px 0; text-decoration: none; font-weight: bold; color: black; }
+        .live { color: red; font-weight: bold; margin-left: 5px; }
+      </style>
+    </head>
+    <body>
+      <h3>🎵 YouTube Live Audio Streams</h3>
+    """
+
+    # show stations with live badge if CACHE has URL
+    for idx, name in enumerate(YOUTUBE_STREAMS.keys(), 1):
+        live = " <span class='live'>LIVE</span>" if name in CACHE else ""
+        display_name = name.replace("_", " ").title()
+        html += f"<a href='/{name}'>{idx}. {display_name}{live}</a>\n"
+
+    html += """
+    </body>
+    </html>
+    """
+    return render_template_string(html)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
