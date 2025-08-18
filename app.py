@@ -83,23 +83,22 @@ def generate_stream(url):
     while True:
         logging.info(f"🎵 Starting FFmpeg stream from: {url}")
 
-        process = subprocess.Popen([
+                process = subprocess.Popen(
+            [
                 "ffmpeg",
                 "-reconnect", "1",
                 "-reconnect_streamed", "1",
                 "-reconnect_delay_max", "10",
-                "-user_agent", "Mozilla/5.0",
                 "-i", url,
                 "-vn",
                 "-ac", "1",
-                "-ar", "22050",   # downsample for lighter playback
-                "-b:a", "24k",   # stable low bitrate
+                "-b:a", "24k",  # a bit higher bitrate, more stable
                 "-f", "mp3",
                 "-"
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            bufsize=4096
+            bufsize=4096   # moderate buffer
         )
 
         try:
