@@ -153,11 +153,13 @@ def stream(station_name):
 def index():
     # Separate live and offline channels
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
-    other_channels = {k: v for k in YOUTUBE_STREAMS.items() if k not in live_channels}
+    other_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k not in live_channels}
     sorted_live = sorted(live_channels.keys())
     sorted_other = sorted(other_channels.keys())
     all_keys = sorted_live + sorted_other
 
+    # Keypad mapping for T9-style shortcuts
+    keypad_map = {}
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -181,8 +183,22 @@ def index():
         display_name = name.replace("_", " ").title()
         html += f"<a href='/{name}'>{idx}. {display_name}{live}</a>\n"
         html += f"<a href='/{name}?high' style='margin-left:20px;font-size:14px;'>↳ High Quality</a>\n"
+        key = idx % 10  # 1-9 then 0
+        keypad_map[str(key)] = name
 
-    html += "</body></html>"
+    html += f"""
+    <script>
+    const streamMap = {keypad_map};
+    document.addEventListener("keydown", function(e) {{
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        const key = e.key;
+        if (key in streamMap) {{
+            window.location.href = '/' + streamMap[key];
+        }}
+    }});
+    </script>
+    </body></html>
+    """
     return render_template_string(html)
 
 # -----------------------
