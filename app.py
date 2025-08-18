@@ -3,6 +3,7 @@ import time
 import threading
 import os
 import logging
+import collections
 from flask import Flask, Response, render_template_string, request
 
 # Configure logging
@@ -64,62 +65,62 @@ def refresh_stream_urls():
 # Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
-def safe_terminate_process(process):
-    """Try to terminate process gracefully, then kill if needed."""
-    if process.poll() is None:  # Still running
-        logging.info("Terminating ffmpeg process...")
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-            logging.info("FFmpeg process terminated gracefully.")
-        except subprocess.TimeoutExpired:
-            logging.warning("FFmpeg process did not terminate in time, killing...")
-            process.kill()
-            process.wait()
-            logging.info("FFmpeg process killed.")
-
 
 def generate_stream(url, high_quality=False):
-    """Streams audio using FFmpeg and auto-reconnects."""
-    while True:
-        if high_quality:
-            ffmpeg_cmd = [
-                "ffmpeg", "-reconnect", "1", "-reconnect_delay_max", "5",
-                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "2", "-ar", "44100", "-b:a", "48k",
-                "-bufsize", "512k", "-f", "mp3", "-"
-            ]
-        else:
-            ffmpeg_cmd = [
-                "ffmpeg", "-reconnect", "1", "-reconnect_delay_max", "5",
-                "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
-                "-i", url, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "16k",
-                "-bufsize", "256k", "-f", "mp3", "-"
-            ]
+    """Streams audio using FFmpeg with buffering."""
+    buffer = collections.deque(maxlen=400)  # store ~40s of chunks
 
-        process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
-        )
+    if high_quality:
+        ffmpeg_cmd = [
+            "ffmpeg", "-reconnect", "1", "-reconnect_delay_max", "5",
+            "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+            "-i", url, "-vn",
+            "-ac", "2", "-ar", "44100", "-b:a", "48k",
+            "-bufsize", "512k", "-f", "mp3", "-"
+        ]
+    else:
+        ffmpeg_cmd = [
+            "ffmpeg", "-reconnect", "1", "-reconnect_delay_max", "5",
+            "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+            "-i", url, "-vn",
+            "-ac", "1", "-ar", "16000", "-b:a", "16k",
+            "-bufsize", "256k", "-f", "mp3", "-"
+        ]
 
-        logging.info(f"🎵 Streaming from: {url} ({'HIGH' if high_quality else 'LOW'})")
+    process = subprocess.Popen(
+        ffmpeg_cmd,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+    )
 
+    logging.info(f"🎵 Streaming from: {url} ({'HIGH' if high_quality else 'LOW'})")
+
+    def reader():
+        """Background reader that fills the buffer continuously."""
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
-                yield chunk
-                time.sleep(0.01)  # smoother streaming on weak networks
-        except GeneratorExit:
-            logging.info("❌ Client disconnected. Stopping FFmpeg process...")
-            process.terminate()
-            process.wait()
-            break
+                buffer.append(chunk)
         except Exception as e:
-            logging.error(f"Stream error: {e}")
+            logging.error(f"Reader error: {e}")
 
-        logging.warning("⚠️ FFmpeg stopped, restarting stream...")
+    # Start background reader thread
+    threading.Thread(target=reader, daemon=True).start()
+
+    # Pre-buffer ~5s before serving
+    logging.info("⏳ Pre-buffering 5s before starting stream...")
+    time.sleep(5)
+
+    try:
+        while True:
+            if buffer:
+                yield buffer.popleft()
+            else:
+                # if buffer empty, wait a little
+                time.sleep(0.05)
+    except GeneratorExit:
+        logging.info("❌ Client disconnected.")
         process.terminate()
         process.wait()
-        time.sleep(5)
+
 
 @app.route("/<station_name>")
 def stream(station_name):
@@ -130,6 +131,7 @@ def stream(station_name):
 
     high_quality = "high" in request.args
     return Response(generate_stream(url, high_quality=high_quality), mimetype="audio/mpeg")
+
 
 @app.route("/")
 def index():
@@ -172,7 +174,7 @@ def index():
     </style>
 </head>
 <body>
-    <h3>🔊 YouTube Live (Low-Speed Friendly)</h3>
+    <h3>🔊 YouTube Live (Buffered, Low-Speed Friendly)</h3>
 """
 
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
@@ -209,6 +211,7 @@ def index():
 </html>
 """
     return render_template_string(html)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
