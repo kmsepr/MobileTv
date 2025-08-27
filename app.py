@@ -110,7 +110,7 @@ def generate_stream(station_name):
     "-i", url,
     "-vn",
     "-ac", "1",
-    "-b:a", "40k",
+    "-b:a", "16k",
     "-f", "mp3",
     "-"
 ],
