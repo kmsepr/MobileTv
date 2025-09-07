@@ -1,8 +1,7 @@
 
 # YouTube Live Audio Streamer
 
-A simple Flask-based server that streams live YouTube audio as MP3 using `yt-dlp` and `ffmpeg`. Perfect for low-bandwidth audio streaming from educational, religious, or news channels — ideal for low-end devices, legacy systems, or internet radios that support only direct MP3 HTTP streams.
-
+A simple Flask-based server that streams live YouTube audio as MP3 using `yt-dlp` and `ffmpeg`.
 ---
 
 ### Features
