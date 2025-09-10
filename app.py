@@ -9,7 +9,7 @@ from collections import deque
 # -----------------------
 # Configure logging
 # -----------------------
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
 
 # -----------------------
@@ -17,20 +17,16 @@ app = Flask(__name__)
 # -----------------------
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-
-"asianet_news": "https://www.youtube.com/@asianetnews/live",
-
-
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
     "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live", 
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",   
-    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",  
-    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",  
+    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
+    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
+    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
     "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
     "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
@@ -38,34 +34,34 @@ YOUTUBE_STREAMS = {
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live"
+    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
 }
 
 # -----------------------
 # Cache for direct stream URLs
 # -----------------------
 CACHE = {}
+COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
 # Extract YouTube audio URL
 # -----------------------
-def get_youtube_audio_url(youtube_url):
+def get_youtube_audio_url(youtube_url: str):
     """Get direct audio URL from YouTube live."""
     try:
-        cmd = [
-    "yt-dlp",
-    "-f", "bestaudio[ext=m4a]/bestaudio/best",
-    "--cookies", "/mnt/data/cookies.txt",
-    "-g", url  # -g = get direct media URL
-]
-        if os.path.exists("/mnt/data/cookies.txt"):
-            command.insert(2, "--cookies")
-            command.insert(3, "/mnt/data/cookies.txt")
+        command = ["yt-dlp", "-f", "91", "-g", youtube_url]
+
+        # Insert cookies if file exists
+        if os.path.exists(COOKIES_FILE):
+            command.insert(1, "--cookies")
+            command.insert(2, COOKIES_FILE)
+
         result = subprocess.run(command, capture_output=True, text=True)
-        if result.returncode == 0:
+
+        if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         else:
-            logging.error(f"yt-dlp error: {result.stderr.strip()}")
+            logging.error(f"yt-dlp error for {youtube_url}: {result.stderr.strip()}")
             return None
     except Exception:
         logging.exception("Exception while extracting YouTube audio")
@@ -95,7 +91,7 @@ threading.Thread(target=refresh_stream_urls, daemon=True).start()
 # -----------------------
 # Stream generator
 # -----------------------
-def generate_stream(station_name):
+def generate_stream(station_name: str):
     """Yield MP3 chunks using FFmpeg with reconnect."""
     url = CACHE.get(station_name)
     if not url:
@@ -107,19 +103,23 @@ def generate_stream(station_name):
     while True:
         process = subprocess.Popen(
             [
-    "ffmpeg",
-    "-reconnect", "1",
-    "-reconnect_streamed", "1",
-    "-reconnect_delay_max", "10",
-    "-user_agent", "Mozilla/5.0",
-    "-i", url,
-    "-vn",
-    "-ac", "1",
-    "-b:a", "40k",
-    "-f", "mp3",
-    "-"
-],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+                "ffmpeg",
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10",
+                "-timeout", "5000000",
+                "-user_agent", "Mozilla/5.0",
+                "-i", url,
+                "-vn",
+                "-ac", "1",
+                "-b:a", "40k",
+                "-bufsize", "1M",
+                "-f", "mp3",
+                "-"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=4096,
         )
 
         logging.info(f"🎵 Streaming {station_name}")
@@ -159,7 +159,6 @@ def stream(station_name):
 # -----------------------
 @app.route("/")
 def index():
-    # Only show channels with active stream URLs
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
     sorted_live = sorted(live_channels.keys())
 
@@ -181,12 +180,11 @@ def index():
       <h3>🎵 Currently Live Streams</h3>
     """
 
-    # JS keypad map
     keypad_map = {}
     for idx, name in enumerate(sorted_live, 1):
         display_name = name.replace("_", " ").title()
         html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
-        key = str(idx % 10)  # 1-9, 0
+        key = str(idx % 10)
         keypad_map[key] = name
 
     html += f"""
