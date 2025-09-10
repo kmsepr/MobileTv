@@ -52,7 +52,12 @@ CACHE = {}
 def get_youtube_audio_url(youtube_url):
     """Get direct audio URL from YouTube live."""
     try:
-        command = ["yt-dlp", "-f", "bestaudio[ext=m4a]/bestaudio/best", "-g", youtube_url]
+        cmd = [
+    "yt-dlp",
+    "-f", "bestaudio[ext=m4a]/bestaudio/best",
+    "--cookies", "/mnt/data/cookies.txt",
+    "-g", url  # -g = get direct media URL
+]
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
