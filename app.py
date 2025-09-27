@@ -1,15 +1,15 @@
-import subprocess
 import time
 import threading
-import os
 import logging
+import requests
 from flask import Flask, Response, render_template_string, abort
+import subprocess, os
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
 
 # -----------------------
-# TV Streams (m3u8)
+# TV Streams (raw m3u8)
 # -----------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
@@ -29,10 +29,11 @@ YOUTUBE_STREAMS = {
 }
 
 CACHE = {}  # Stores direct YouTube live URLs
+LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube Live URL
+# Extract YouTube Live URL (raw HLS)
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
     try:
@@ -43,7 +44,7 @@ def get_youtube_live_url(youtube_url: str):
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-        logging.error(f"yt-dlp error for {youtube_url}: {result.stderr.strip()}")
+        logging.info(f"Not live yet: {youtube_url}")
         return None
     except Exception:
         logging.exception("Exception while extracting YouTube live URL")
@@ -53,71 +54,51 @@ def get_youtube_live_url(youtube_url: str):
 # Refresh YouTube URLs
 # -----------------------
 def refresh_stream_urls():
-    last_update = {}
     while True:
         logging.info("🔄 Refreshing YouTube live URLs...")
-        now = time.time()
         for name, url in YOUTUBE_STREAMS.items():
-            if name not in last_update or now - last_update[name] > 60:
-                direct_url = get_youtube_live_url(url)
-                if direct_url:
-                    CACHE[name] = direct_url
-                    last_update[name] = now
-                    logging.info(f"✅ Updated {name}")
-                else:
-                    logging.warning(f"❌ Failed to update {name}")
+            direct_url = get_youtube_live_url(url)
+            if direct_url:
+                CACHE[name] = direct_url
+                LIVE_STATUS[name] = True
+                logging.info(f"✅ Live: {name}")
+            else:
+                LIVE_STATUS[name] = False
         time.sleep(60)
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Generate 360p HLS
+# Proxy raw HLS
 # -----------------------
-def generate_hls(url: str):
-    process = subprocess.Popen(
-        [
-            "ffmpeg",
-            "-i", url,
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-b:v", "500k",
-            "-maxrate", "500k",
-            "-bufsize", "1000k",
-            "-vf", "scale=-2:360",
-            "-c:a", "aac",
-            "-b:a", "64k",
-            "-f", "hls",
-            "-hls_time", "4",
-            "-hls_playlist_type", "event",
-            "-"
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        bufsize=10**6,
-    )
+def stream_proxy(url: str):
     try:
-        for chunk in iter(lambda: process.stdout.read(4096), b""):
-            yield chunk
-    finally:
-        process.terminate()
-        process.wait()
+        with requests.get(url, stream=True, timeout=10) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=4096):
+                if chunk:
+                    yield chunk
+    except Exception as e:
+        logging.error(f"Error proxying stream {url}: {e}")
+        yield b""
 
 # -----------------------
 # Flask Routes
 # -----------------------
 @app.route("/")
 def home():
-    all_channels = list(TV_STREAMS.keys()) + list(YOUTUBE_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = list(TV_STREAMS.keys()) + live_youtube
     html = """<html>
 <head>
-<title>📺 TV & YouTube Live 360p HLS</title>
+<title>📺 TV & YouTube Live Raw HLS</title>
 <style>
 body { font-family: sans-serif; background:#111; color:#fff; padding:20px; }
 a { color:#0f0; display:block; margin:10px 0; font-size:18px; text-decoration:none; }
 </style>
 </head>
 <body>
-<h2>📺 TV & YouTube Live 360p HLS</h2>
+<h2>📺 TV & YouTube Live Raw HLS</h2>
 {% for key in channels %}
 <a href="/watch/{{ key }}">▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
@@ -126,11 +107,11 @@ a { color:#0f0; display:block; margin:10px 0; font-size:18px; text-decoration:no
 
 @app.route("/watch/<channel>")
 def watch(channel):
-    if channel not in TV_STREAMS and channel not in YOUTUBE_STREAMS:
+    if channel not in TV_STREAMS and channel not in CACHE:
         abort(404)
     html = f"""
 <html><body style="background:#000; color:#fff; text-align:center;">
-<h2>{channel.replace('_',' ').title()} (360p HLS)</h2>
+<h2>{channel.replace('_',' ').title()} (Raw HLS)</h2>
 <video controls autoplay style="width:95%; max-width:700px;">
 <source src="/stream/{channel}" type="application/vnd.apple.mpegurl">
 </video>
@@ -143,7 +124,7 @@ def stream(channel):
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
-    return Response(generate_hls(url), mimetype="application/vnd.apple.mpegurl")
+    return Response(stream_proxy(url), mimetype="application/vnd.apple.mpegurl")
 
 # -----------------------
 # Run
