@@ -136,6 +136,8 @@ def generate_stream(station_name: str):
 @app.route("/")
 def home():
     all_channels = list(TV_STREAMS.keys()) + list(YOUTUBE_STREAMS.keys())
+    enumerated_channels = list(enumerate(all_channels, 1))  # enumerate in Python
+    
     html = """<html>
 <head>
 <title>📺 Live TV & 🎵 YouTube</title>
@@ -149,7 +151,7 @@ a { color:#0f0; text-decoration:none; font-size:18px; }
 <body>
 <h2>📺 TV & 🎵 YouTube Live</h2>
 <div class="grid" id="channelGrid">
-{% for idx, key in enumerate(channels, 1) %}
+{% for idx, key in channels %}
 <div class="card">
 <a href="/watch/{{ key }}">▶ {{ idx }}. {{ key.replace('_',' ').title() }}</a>
 </div>
@@ -169,7 +171,7 @@ document.addEventListener("keydown", function(event) {
 </script>
 </body>
 </html>"""
-    return render_template_string(html, channels=all_channels)
+    return render_template_string(html, channels=enumerated_channels)
 
 @app.route("/watch/<channel>")
 def watch(channel):
