@@ -70,6 +70,9 @@ def get_youtube_audio_url(youtube_url: str):
         logging.exception("Exception while extracting YouTube stream")
         return None
 
+# -----------------------
+# Background thread to refresh YouTube URLs
+# -----------------------
 def refresh_stream_urls():
     last_update = {}
     while True:
@@ -132,43 +135,40 @@ def generate_stream(station_name: str):
 # -----------------------
 @app.route("/")
 def home():
-    # merge static TV + dynamic YT
     all_channels = list(TV_STREAMS.keys()) + list(YOUTUBE_STREAMS.keys())
-    html = """
-    <html>
-    <head>
-        <title>📺 Live TV & 🎵 YouTube</title>
-        <style>
-            body { font-family: sans-serif; text-align:center; background:#111; color:#fff; }
-            .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:20px; }
-            .card { background:#222; padding:20px; border-radius:10px; }
-            a { color:#0f0; text-decoration:none; font-size:18px; }
-        </style>
-    </head>
-    <body>
-        <h2>📺 TV & 🎵 YouTube Live</h2>
-        <div class="grid" id="channelGrid">
-            {% for idx, key in enumerate(channels, 1) %}
-                <div class="card">
-                    <a href="/watch/{{ key }}">▶ {{ idx }}. {{ key.replace('_',' ').title() }}</a>
-                </div>
-            {% endfor %}
-        </div>
+    html = """<html>
+<head>
+<title>📺 Live TV & 🎵 YouTube</title>
+<style>
+body { font-family: sans-serif; text-align:center; background:#111; color:#fff; }
+.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:20px; }
+.card { background:#222; padding:20px; border-radius:10px; }
+a { color:#0f0; text-decoration:none; font-size:18px; }
+</style>
+</head>
+<body>
+<h2>📺 TV & 🎵 YouTube Live</h2>
+<div class="grid" id="channelGrid">
+{% for idx, key in enumerate(channels, 1) %}
+<div class="card">
+<a href="/watch/{{ key }}">▶ {{ idx }}. {{ key.replace('_',' ').title() }}</a>
+</div>
+{% endfor %}
+</div>
 
-        <script>
-        document.addEventListener("keydown", function(event) {
-            let num = parseInt(event.key);
-            if (!isNaN(num) && num > 0) {
-                let links = document.querySelectorAll("#channelGrid a");
-                if (num <= links.length) {
-                    window.location.href = links[num-1].href;
-                }
-            }
-        });
-        </script>
-    </body>
-    </html>
-    """
+<script>
+document.addEventListener("keydown", function(event) {
+    let num = parseInt(event.key);
+    if (!isNaN(num) && num > 0) {
+        let links = document.querySelectorAll("#channelGrid a");
+        if (num <= links.length) {
+            window.location.href = links[num-1].href;
+        }
+    }
+});
+</script>
+</body>
+</html>"""
     return render_template_string(html, channels=all_channels)
 
 @app.route("/watch/<channel>")
@@ -176,28 +176,28 @@ def watch(channel):
     if channel in TV_STREAMS:
         stream_url = TV_STREAMS[channel]
         html = """
-        <html><body style="background:#000; color:#fff; text-align:center;">
-        <h2>{{ channel.replace('_',' ').title() }}</h2>
-        <video controls autoplay style="width:95%; max-width:700px;">
-            <source src="{{ url }}" type="application/x-mpegURL">
-        </video>
-        <p><a href="/">⬅ Back</a></p>
-        </body></html>
-        """
+<html><body style="background:#000; color:#fff; text-align:center;">
+<h2>{{ channel.replace('_',' ').title() }}</h2>
+<video controls autoplay style="width:95%; max-width:700px;">
+<source src="{{ url }}" type="application/x-mpegURL">
+</video>
+<p><a href="/">⬅ Back</a></p>
+</body></html>
+"""
         return render_template_string(html, channel=channel, url=stream_url)
 
     elif channel in YOUTUBE_STREAMS:
         if channel not in CACHE:
             return "YouTube stream not ready yet, try again.", 503
         html = f"""
-        <html><body style="background:#000; color:#fff; text-align:center;">
-        <h2>{channel.replace('_',' ').title()}</h2>
-        <audio controls autoplay style="width:95%; max-width:700px;">
-            <source src="/{channel}" type="audio/mpeg">
-        </audio>
-        <p><a href="/">⬅ Back</a></p>
-        </body></html>
-        """
+<html><body style="background:#000; color:#fff; text-align:center;">
+<h2>{channel.replace('_',' ').title()}</h2>
+<audio controls autoplay style="width:95%; max-width:700px;">
+<source src="/{channel}" type="audio/mpeg">
+</audio>
+<p><a href="/">⬅ Back</a></p>
+</body></html>
+"""
         return html
 
     else:
