@@ -1,102 +1,91 @@
-from flask import Flask, Response, render_template_string
+from flask import Flask, render_template_string, Response
 import subprocess
-import os
 
 app = Flask(__name__)
 
-# -----------------------
-# Streams
-# -----------------------
+# ✅ Your YouTube live channels
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-    "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
+    "kairali_we": "https://www.youtube.com/@KairaliTV/live",
+    "victers_tv": "https://www.youtube.com/@itsvicters/live",
+    "safari_tv": "https://www.youtube.com/@safaritvonline/live",
+    "aljazeera_english": "https://www.youtube.com/@aljazeeraenglish/live",
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeeraarabic/live",
 }
 
-TV_STREAMS = {
-    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
-    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/victers/tv1/chunks.m3u8",
-    "kairali_we": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/wetv_nim_https/050522/wetv/playlist.m3u8",
-    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
-}
+# ---------- HTML TEMPLATES ----------
+HOME_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TV Grid</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; padding: 20px; }
+    .card { background: #222; padding: 20px; text-align: center; border-radius: 10px; }
+    .card a { color: #0ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;">📺 Live TV</h2>
+  <div class="grid">
+    {% for key, url in streams.items() %}
+      <div class="card">
+        <a href="/yt/{{ key }}">{{ key.replace('_',' ').title() }}</a>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>
+"""
 
-# -----------------------
-# FFmpeg proxy (TV + YouTube)
-# -----------------------
-def proxy_stream(url):
-    ffmpeg_cmd = [
-        "ffmpeg",
-        "-reconnect", "1",
-        "-reconnect_streamed", "1",
-        "-reconnect_delay_max", "10",
-        "-i", url,
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-movflags", "frag_keyframe+empty_moov",
-        "-f", "mp4",
-        "-"
-    ]
-    process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    try:
-        for chunk in iter(lambda: process.stdout.read(4096), b""):
-            yield chunk
-    except GeneratorExit:
-        process.kill()
-    except Exception:
-        process.kill()
+PLAYER_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ name }}</title>
+  <style>
+    body { margin:0; background:black; display:flex; flex-direction:column; height:100vh; }
+    video { flex:1; width:100%; height:100%; background:black; }
+    a { padding:10px; text-align:center; display:block; color:#0ff; background:#111; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <video controls autoplay>
+    <source src="{{ url }}" type="video/mp4">
+    Your browser does not support video playback.
+  </video>
+  <a href="/">⬅ Back</a>
+</body>
+</html>
+"""
 
-# -----------------------
-# Routes
-# -----------------------
+# ---------- ROUTES ----------
+
 @app.route("/")
-def index():
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Live Streams</title>
-      <style>
-        body { font-family: sans-serif; padding: 10px; background: #fff; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-        .card { padding: 20px; background: #f0f0f0; text-align: center; border-radius: 8px; }
-        .card a { text-decoration: none; color: black; font-weight: bold; }
-        .card:hover { background: #ddd; }
-      </style>
-    </head>
-    <body>
-      <h2>📺 Live Streams</h2>
-      <div class="grid">
-    """
-    # YouTube
-    for name in YOUTUBE_STREAMS:
-        html += f"<div class='card'><a href='/yt/{name}'>{name.replace('_',' ').title()}</a></div>"
-    # TV
-    for name in TV_STREAMS:
-        html += f"<div class='card'><a href='/tv/{name}'>{name.replace('_',' ').title()}</a></div>"
-    html += "</div></body></html>"
-    return render_template_string(html)
-
-@app.route("/tv/<station>")
-def tv(station):
-    if station not in TV_STREAMS:
-        return "Not found", 404
-    return Response(proxy_stream(TV_STREAMS[station]), mimetype="video/mp4")
+def home():
+    return render_template_string(HOME_HTML, streams=YOUTUBE_STREAMS)
 
 @app.route("/yt/<station>")
 def yt(station):
     if station not in YOUTUBE_STREAMS:
-        return "Not found", 404
-    # convert YT live link → direct stream with yt-dlp
-    cmd = ["yt-dlp", "-f", "best", "-g", YOUTUBE_STREAMS[station]]
-    url = subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
-    if not url:
-        return "Stream unavailable", 503
-    return Response(proxy_stream(url), mimetype="video/mp4")
+        return "Channel not found", 404
 
-# -----------------------
-# Run Flask
-# -----------------------
+    yt_url = YOUTUBE_STREAMS[station]
+
+    # 🔹 Use yt-dlp to extract the best playable stream URL
+    cmd = ["yt-dlp", "-f", "bestaudio[ext=m4a]/best", "-g", yt_url]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    stream_url = result.stdout.strip()
+    if not stream_url:
+        return f"Stream unavailable: {result.stderr}", 503
+
+    # Instead of raw stream, embed in a player
+    return render_template_string(PLAYER_HTML, name=station.replace("_"," ").title(), url=stream_url)
+
+# ---------- MAIN ----------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port, threaded=True)
+    app.run(host="0.0.0.0", port=8000)
