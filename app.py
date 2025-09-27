@@ -38,20 +38,30 @@ YOUTUBE_STREAMS = {
 }
 
 # -----------------------
+# Direct TV Streams (HLS links)
+# -----------------------
+TV_STREAMS = {
+    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/victers/tv1/chunks.m3u8",
+    "kairali_we": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/wetv_nim_https/050522/wetv/playlist.m3u8",
+    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
+}
+
+# -----------------------
 # Cache for direct stream URLs
 # -----------------------
 CACHE = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube audio URL
+# Extract YouTube video+audio URL
 # -----------------------
-def get_youtube_audio_url(youtube_url: str):
-    """Get direct audio URL from YouTube live."""
+def get_youtube_stream_url(youtube_url: str):
+    """Get direct video+audio URL from YouTube live."""
     try:
-        command = ["yt-dlp", "-f", "91", "-g", youtube_url]
+        command = ["yt-dlp", "-f", "best[ext=mp4]/best", "-g", youtube_url]
 
-        # Insert cookies if file exists
+        # Insert cookies if available
         if os.path.exists(COOKIES_FILE):
             command.insert(1, "--cookies")
             command.insert(2, COOKIES_FILE)
@@ -64,7 +74,7 @@ def get_youtube_audio_url(youtube_url: str):
             logging.error(f"yt-dlp error for {youtube_url}: {result.stderr.strip()}")
             return None
     except Exception:
-        logging.exception("Exception while extracting YouTube audio")
+        logging.exception("Exception while extracting YouTube video")
         return None
 
 # -----------------------
@@ -77,7 +87,7 @@ def refresh_stream_urls():
         now = time.time()
         for name, url in YOUTUBE_STREAMS.items():
             if name not in last_update or now - last_update[name] > 60:
-                direct_url = get_youtube_audio_url(url)
+                direct_url = get_youtube_stream_url(url)
                 if direct_url:
                     CACHE[name] = direct_url
                     last_update[name] = now
@@ -92,37 +102,43 @@ threading.Thread(target=refresh_stream_urls, daemon=True).start()
 # Stream generator
 # -----------------------
 def generate_stream(station_name: str):
-    """Yield MP3 chunks using FFmpeg with reconnect."""
-    url = CACHE.get(station_name)
+    """Yield MP4 chunks (YouTube + TV) using FFmpeg with reconnect."""
+    url = None
+
+    if station_name in CACHE:       # YouTube (cached)
+        url = CACHE.get(station_name)
+    elif station_name in TV_STREAMS:  # Direct TV
+        url = TV_STREAMS[station_name]
+
     if not url:
-        logging.warning(f"No cached URL for {station_name}")
+        logging.warning(f"No stream URL for {station_name}")
         return
 
-    buffer = deque(maxlen=2000)  # ~2 min buffer
+    buffer = deque(maxlen=2000)
 
     while True:
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "10",
+            "-timeout", "5000000",
+            "-user_agent", "Mozilla/5.0",
+            "-i", url,
+            "-c:v", "copy",   # keep video
+            "-c:a", "aac",    # ensure audio compatibility
+            "-f", "mp4",
+            "-"
+        ]
+
         process = subprocess.Popen(
-            [
-                "ffmpeg",
-                "-reconnect", "1",
-                "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "10",
-                "-timeout", "5000000",
-                "-user_agent", "Mozilla/5.0",
-                "-i", url,
-                "-vn",
-                "-ac", "1",
-                "-b:a", "40k",
-                "-bufsize", "1M",
-                "-f", "mp3",
-                "-"
-            ],
+            ffmpeg_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             bufsize=4096,
         )
 
-        logging.info(f"🎵 Streaming {station_name}")
+        logging.info(f"▶️ Streaming {station_name} as MP4")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
@@ -149,17 +165,20 @@ def generate_stream(station_name: str):
 # -----------------------
 @app.route("/<station_name>")
 def stream(station_name):
-    url = CACHE.get(station_name)
-    if not url:
+    if station_name in CACHE or station_name in TV_STREAMS:
+        return Response(generate_stream(station_name), mimetype="video/mp4")
+    else:
         return "Station not found or not available", 404
-    return Response(generate_stream(station_name), mimetype="audio/mpeg")
 
 # -----------------------
 # Homepage
 # -----------------------
 @app.route("/")
 def index():
+    # Live YouTube (only if cached) + always-available TV streams
     live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
+    live_channels.update(TV_STREAMS)
+
     sorted_live = sorted(live_channels.keys())
 
     html = """
@@ -168,38 +187,23 @@ def index():
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>YouTube Live Audio Streams</title>
+      <title>Live MP4 Streams</title>
       <style>
         body { font-family: sans-serif; padding: 10px; background: #fff; }
-        a { display: block; margin: 5px 0; font-weight: bold; color: blue; text-decoration: underline; cursor: pointer; }
-        a:hover { color: red; }
-        .live { color: red; font-weight: bold; margin-left: 5px; }
+        video { width: 100%; max-width: 500px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
+        h3 { margin-top: 20px; }
       </style>
     </head>
     <body>
-      <h3>🎵 Currently Live Streams</h3>
+      <h3>📺 Live YouTube + TV Streams</h3>
     """
 
-    keypad_map = {}
     for idx, name in enumerate(sorted_live, 1):
         display_name = name.replace("_", " ").title()
-        html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
-        key = str(idx % 10)
-        keypad_map[key] = name
+        html += f"<p>{idx}. {display_name}</p>"
+        html += f"<video controls autoplay src='/{name}'></video>\n"
 
-    html += f"""
-    <script>
-    const streamMap = {keypad_map};
-    document.addEventListener("keydown", function(e) {{
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-        const key = e.key;
-        if (key in streamMap) {{
-            window.location.href = '/' + streamMap[key];
-        }}
-    }});
-    </script>
-    </body></html>
-    """
+    html += "</body></html>"
     return render_template_string(html)
 
 # -----------------------
