@@ -1,22 +1,21 @@
-# Use slim Python image
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies (ffmpeg + curl)
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install yt-dlp
-RUN pip install --no-cache-dir --upgrade pip yt-dlp
+# Copy requirements and install Python dependencies
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app files
+# Copy app source
 COPY . /app
 
-# Expose port
 EXPOSE 8000
 
-# Run Flask app
 CMD ["python", "app.py"]
