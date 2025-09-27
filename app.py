@@ -1,15 +1,14 @@
 import time
 import threading
 import logging
-import requests
 from flask import Flask, Response, render_template_string, abort
-import subprocess, os
+import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
 
 # -----------------------
-# TV Streams (raw m3u8)
+# TV Streams (direct m3u8)
 # -----------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
@@ -44,10 +43,8 @@ def get_youtube_live_url(youtube_url: str):
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-        logging.info(f"Not live yet: {youtube_url}")
         return None
     except Exception:
-        logging.exception("Exception while extracting YouTube live URL")
         return None
 
 # -----------------------
@@ -61,7 +58,6 @@ def refresh_stream_urls():
             if direct_url:
                 CACHE[name] = direct_url
                 LIVE_STATUS[name] = True
-                logging.info(f"✅ Live: {name}")
             else:
                 LIVE_STATUS[name] = False
         time.sleep(60)
@@ -69,7 +65,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Proxy raw HLS
+# Proxy YouTube HLS
 # -----------------------
 def stream_proxy(url: str):
     try:
@@ -78,8 +74,7 @@ def stream_proxy(url: str):
             for chunk in r.iter_content(chunk_size=4096):
                 if chunk:
                     yield chunk
-    except Exception as e:
-        logging.error(f"Error proxying stream {url}: {e}")
+    except Exception:
         yield b""
 
 # -----------------------
@@ -87,20 +82,27 @@ def stream_proxy(url: str):
 # -----------------------
 @app.route("/")
 def home():
+    # TV always visible
+    tv_channels = list(TV_STREAMS.keys())
+    # Only live YouTube channels
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
-    all_channels = list(TV_STREAMS.keys()) + live_youtube
+    all_channels = tv_channels + live_youtube
+
     html = """<html>
 <head>
-<title>📺 TV & YouTube Live Raw HLS</title>
+<title>📺 TV & YouTube Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { font-family: sans-serif; background:#111; color:#fff; padding:20px; }
-a { color:#0f0; display:block; margin:10px 0; font-size:18px; text-decoration:none; }
+body { font-family: sans-serif; background:#111; color:#fff; padding:10px; }
+a { color:#0f0; display:block; margin:10px 0; font-size:24px; padding:10px; background:#222; border-radius:8px; text-decoration:none; }
+a:hover { background:#333; }
+h2 { font-size:28px; text-align:center; margin-bottom:20px; }
 </style>
 </head>
 <body>
-<h2>📺 TV & YouTube Live Raw HLS</h2>
-{% for key in channels %}
-<a href="/watch/{{ key }}">▶ {{ key.replace('_',' ').title() }}</a>
+<h2>📺 TV & YouTube Live</h2>
+{% for idx, key in enumerate(channels) %}
+<a href="/watch/{{ key }}">[{{ idx+1 }}] ▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
 </body></html>"""
     return render_template_string(html, channels=all_channels)
@@ -109,25 +111,38 @@ a { color:#0f0; display:block; margin:10px 0; font-size:18px; text-decoration:no
 def watch(channel):
     if channel not in TV_STREAMS and channel not in CACHE:
         abort(404)
+    if channel in TV_STREAMS:
+        video_url = TV_STREAMS[channel]
+    else:
+        video_url = f"/stream/{channel}"
+
     html = f"""
-<html><body style="background:#000; color:#fff; text-align:center;">
-<h2>{channel.replace('_',' ').title()} (Raw HLS)</h2>
-<video controls autoplay style="width:95%; max-width:700px;">
-<source src="/stream/{channel}" type="application/vnd.apple.mpegurl">
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{channel.replace('_',' ').title()}</title>
+<style>
+body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
+video {{ width:95%; max-width:700px; }}
+a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration:none; }}
+</style>
+</head>
+<body>
+<h2>{channel.replace('_',' ').title()}</h2>
+<video controls autoplay>
+<source src="{video_url}" type="application/vnd.apple.mpegurl">
 </video>
-<p><a href='/'>⬅ Back</a></p>
-</body></html>"""
+<a href='/'>⬅ Back</a>
+</body>
+</html>"""
     return html
 
 @app.route("/stream/<channel>")
 def stream(channel):
-    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    url = CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
     return Response(stream_proxy(url), mimetype="application/vnd.apple.mpegurl")
 
-# -----------------------
-# Run
-# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
