@@ -101,8 +101,8 @@ h2 { font-size:28px; text-align:center; margin-bottom:20px; }
 </head>
 <body>
 <h2>📺 TV & YouTube Live</h2>
-{% for idx, key in enumerate(channels) %}
-<a href="/watch/{{ key }}">[{{ idx+1 }}] ▶ {{ key.replace('_',' ').title() }}</a>
+{% for key in channels %}
+<a href="/watch/{{ key }}">[{{ loop.index }}] ▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
 </body></html>"""
     return render_template_string(html, channels=all_channels)
