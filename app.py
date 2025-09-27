@@ -29,23 +29,17 @@ YOUTUBE_STREAMS = {
 }
 
 CACHE = {}  # Stores direct YouTube live URLs
-COOKIES_FILE = "/mnt/data/cookies.txt"  # optional for age-restricted channels
+COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube Live URL (video+audio)
+# Extract YouTube Live URL
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
     try:
-        cmd = [
-            "yt-dlp",
-            "-f", "best[height<=480]/best",  # best quality <=480p
-            "-g",
-            youtube_url
-        ]
+        cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", youtube_url]
         if os.path.exists(COOKIES_FILE):
             cmd.insert(1, "--cookies")
             cmd.insert(2, COOKIES_FILE)
-
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -56,7 +50,7 @@ def get_youtube_live_url(youtube_url: str):
         return None
 
 # -----------------------
-# Background thread to refresh URLs
+# Refresh YouTube URLs
 # -----------------------
 def refresh_stream_urls():
     last_update = {}
@@ -77,22 +71,24 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Generate 3GP AAC 240p
+# Generate 360p HLS
 # -----------------------
-def generate_3gp_video(url: str):
+def generate_hls(url: str):
     process = subprocess.Popen(
         [
             "ffmpeg",
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_delay_max", "10",
             "-i", url,
-            "-vf", "scale=-2:240",  # 240p
             "-c:v", "libx264",
             "-preset", "veryfast",
+            "-b:v", "500k",
+            "-maxrate", "500k",
+            "-bufsize", "1000k",
+            "-vf", "scale=-2:360",
             "-c:a", "aac",
             "-b:a", "64k",
-            "-f", "mp4",  # 3GP container can be mp4 for simplicity
+            "-f", "hls",
+            "-hls_time", "4",
+            "-hls_playlist_type", "event",
             "-"
         ],
         stdout=subprocess.PIPE,
@@ -102,94 +98,55 @@ def generate_3gp_video(url: str):
     try:
         for chunk in iter(lambda: process.stdout.read(4096), b""):
             yield chunk
-    except GeneratorExit:
-        process.terminate()
-        process.wait()
-    except Exception as e:
-        logging.error(f"Video stream error: {e}")
+    finally:
         process.terminate()
         process.wait()
 
 # -----------------------
-# Home Route (Vertical List)
+# Flask Routes
 # -----------------------
 @app.route("/")
 def home():
     all_channels = list(TV_STREAMS.keys()) + list(YOUTUBE_STREAMS.keys())
-    enumerated_channels = list(enumerate(all_channels, 1))
     html = """<html>
 <head>
-<title>📺 TV & YouTube Live 3GP</title>
+<title>📺 TV & YouTube Live 360p HLS</title>
 <style>
-body { font-family: sans-serif; text-align:center; background:#111; color:#fff; }
-ul { list-style:none; padding:0; margin:20px auto; max-width:400px; }
-li { background:#222; margin:10px 0; padding:15px; border-radius:8px; }
-a { color:#0f0; text-decoration:none; font-size:18px; display:block; }
+body { font-family: sans-serif; background:#111; color:#fff; padding:20px; }
+a { color:#0f0; display:block; margin:10px 0; font-size:18px; text-decoration:none; }
 </style>
 </head>
 <body>
-<h2>📺 TV & YouTube Live 3GP</h2>
-<ul id="channelList">
-{% for idx, key in channels %}
-<li>
-<a href="/watch/{{ key }}">▶ {{ idx }}. {{ key.replace('_',' ').title() }}</a>
-</li>
+<h2>📺 TV & YouTube Live 360p HLS</h2>
+{% for key in channels %}
+<a href="/watch/{{ key }}">▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
-</ul>
-<script>
-document.addEventListener("keydown", function(event) {
-    let num = parseInt(event.key);
-    if (!isNaN(num) && num > 0) {
-        let links = document.querySelectorAll("#channelList a");
-        if (num <= links.length) window.location.href = links[num-1].href;
-    }
-});
-</script>
 </body></html>"""
-    return render_template_string(html, channels=enumerated_channels)
+    return render_template_string(html, channels=all_channels)
 
-# -----------------------
-# Watch Route
-# -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
-    if channel in TV_STREAMS:
-        stream_url = TV_STREAMS[channel]
-    elif channel in YOUTUBE_STREAMS:
-        if channel not in CACHE:
-            return "YouTube stream not ready yet, try again.", 503
-        stream_url = CACHE[channel]
-    else:
+    if channel not in TV_STREAMS and channel not in YOUTUBE_STREAMS:
         abort(404)
-
     html = f"""
 <html><body style="background:#000; color:#fff; text-align:center;">
-<h2>{channel.replace('_',' ').title()} (3GP AAC)</h2>
+<h2>{channel.replace('_',' ').title()} (360p HLS)</h2>
 <video controls autoplay style="width:95%; max-width:700px;">
-<source src="/stream/{channel}" type="video/mp4">
+<source src="/stream/{channel}" type="application/vnd.apple.mpegurl">
 </video>
 <p><a href='/'>⬅ Back</a></p>
 </body></html>"""
     return html
 
-# -----------------------
-# Stream Route
-# -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
-    if channel in TV_STREAMS:
-        url = TV_STREAMS[channel]
-    elif channel in YOUTUBE_STREAMS:
-        if channel not in CACHE:
-            return "YouTube stream not ready yet", 503
-        url = CACHE[channel]
-    else:
-        return "Channel not found", 404
-
-    return Response(generate_3gp_video(url), mimetype="video/mp4")
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
+    return Response(generate_hls(url), mimetype="application/vnd.apple.mpegurl")
 
 # -----------------------
-# Run App
+# Run
 # -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
