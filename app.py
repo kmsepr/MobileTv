@@ -26,11 +26,10 @@ YOUTUBE_STREAMS = {
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    # add more as needed
 }
 
 CACHE = {}  # Stores direct YouTube live URLs
-COOKIES_FILE = "/mnt/data/cookies.txt"
+COOKIES_FILE = "/mnt/data/cookies.txt"  # optional for age-restricted channels
 
 # -----------------------
 # Extract YouTube Live URL (video+audio)
@@ -39,7 +38,7 @@ def get_youtube_live_url(youtube_url: str):
     try:
         cmd = [
             "yt-dlp",
-            "-f", "bestvideo[height<=480]+bestaudio/best",  # get video+audio
+            "-f", "best[height<=480]/best",  # best quality <=480p
             "-g",
             youtube_url
         ]
@@ -78,9 +77,9 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Generate 240p video (for TV or YouTube)
+# Generate 3GP AAC 240p
 # -----------------------
-def generate_240p_video(url: str):
+def generate_3gp_video(url: str):
     process = subprocess.Popen(
         [
             "ffmpeg",
@@ -88,12 +87,12 @@ def generate_240p_video(url: str):
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "10",
             "-i", url,
-            "-vf", "scale=-2:240",  # scale to 240p
+            "-vf", "scale=-2:240",  # 240p
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-c:a", "aac",
             "-b:a", "64k",
-            "-f", "mp4",
+            "-f", "mp4",  # 3GP container can be mp4 for simplicity
             "-"
         ],
         stdout=subprocess.PIPE,
@@ -112,7 +111,7 @@ def generate_240p_video(url: str):
         process.wait()
 
 # -----------------------
-# Flask Routes
+# Home Route (Vertical List)
 # -----------------------
 @app.route("/")
 def home():
@@ -120,28 +119,28 @@ def home():
     enumerated_channels = list(enumerate(all_channels, 1))
     html = """<html>
 <head>
-<title>📺 TV & YouTube Live 240p</title>
+<title>📺 TV & YouTube Live 3GP</title>
 <style>
 body { font-family: sans-serif; text-align:center; background:#111; color:#fff; }
-.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:20px; }
-.card { background:#222; padding:20px; border-radius:10px; }
-a { color:#0f0; text-decoration:none; font-size:18px; }
+ul { list-style:none; padding:0; margin:20px auto; max-width:400px; }
+li { background:#222; margin:10px 0; padding:15px; border-radius:8px; }
+a { color:#0f0; text-decoration:none; font-size:18px; display:block; }
 </style>
 </head>
 <body>
-<h2>📺 TV & YouTube Live 240p</h2>
-<div class="grid" id="channelGrid">
+<h2>📺 TV & YouTube Live 3GP</h2>
+<ul id="channelList">
 {% for idx, key in channels %}
-<div class="card">
+<li>
 <a href="/watch/{{ key }}">▶ {{ idx }}. {{ key.replace('_',' ').title() }}</a>
-</div>
+</li>
 {% endfor %}
-</div>
+</ul>
 <script>
 document.addEventListener("keydown", function(event) {
     let num = parseInt(event.key);
     if (!isNaN(num) && num > 0) {
-        let links = document.querySelectorAll("#channelGrid a");
+        let links = document.querySelectorAll("#channelList a");
         if (num <= links.length) window.location.href = links[num-1].href;
     }
 });
@@ -149,6 +148,9 @@ document.addEventListener("keydown", function(event) {
 </body></html>"""
     return render_template_string(html, channels=enumerated_channels)
 
+# -----------------------
+# Watch Route
+# -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
     if channel in TV_STREAMS:
@@ -162,7 +164,7 @@ def watch(channel):
 
     html = f"""
 <html><body style="background:#000; color:#fff; text-align:center;">
-<h2>{channel.replace('_',' ').title()} (240p)</h2>
+<h2>{channel.replace('_',' ').title()} (3GP AAC)</h2>
 <video controls autoplay style="width:95%; max-width:700px;">
 <source src="/stream/{channel}" type="video/mp4">
 </video>
@@ -170,6 +172,9 @@ def watch(channel):
 </body></html>"""
     return html
 
+# -----------------------
+# Stream Route
+# -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
     if channel in TV_STREAMS:
@@ -181,10 +186,10 @@ def stream(channel):
     else:
         return "Channel not found", 404
 
-    return Response(generate_240p_video(url), mimetype="video/mp4")
+    return Response(generate_3gp_video(url), mimetype="video/mp4")
 
 # -----------------------
-# Run
+# Run App
 # -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
