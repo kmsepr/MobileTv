@@ -1,91 +1,72 @@
-from flask import Flask, render_template_string, Response
-import subprocess
+from flask import Flask, render_template_string, abort
 
 app = Flask(__name__)
 
-# ✅ Your YouTube live channels
-YOUTUBE_STREAMS = {
-    "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-    "kairali_we": "https://www.youtube.com/@KairaliTV/live",
-    "victers_tv": "https://www.youtube.com/@itsvicters/live",
-    "safari_tv": "https://www.youtube.com/@safaritvonline/live",
-    "aljazeera_english": "https://www.youtube.com/@aljazeeraenglish/live",
-    "aljazeera_arabic": "https://www.youtube.com/@aljazeeraarabic/live",
+# ---------------- TV STREAM LINKS ----------------
+STREAM_LINKS = {
+    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/victers/tv1/chunks.m3u8",
+    "kairali_we": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/wetv_nim_https/050522/wetv/playlist.m3u8",
+    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
 }
 
-# ---------- HTML TEMPLATES ----------
-HOME_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>TV Grid</title>
-  <style>
-    body { font-family: sans-serif; background: #111; color: #eee; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; padding: 20px; }
-    .card { background: #222; padding: 20px; text-align: center; border-radius: 10px; }
-    .card a { color: #0ff; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <h2 style="text-align:center;">📺 Live TV</h2>
-  <div class="grid">
-    {% for key, url in streams.items() %}
-      <div class="card">
-        <a href="/yt/{{ key }}">{{ key.replace('_',' ').title() }}</a>
-      </div>
-    {% endfor %}
-  </div>
-</body>
-</html>
-"""
-
-PLAYER_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>{{ name }}</title>
-  <style>
-    body { margin:0; background:black; display:flex; flex-direction:column; height:100vh; }
-    video { flex:1; width:100%; height:100%; background:black; }
-    a { padding:10px; text-align:center; display:block; color:#0ff; background:#111; text-decoration:none; }
-  </style>
-</head>
-<body>
-  <video controls autoplay>
-    <source src="{{ url }}" type="video/mp4">
-    Your browser does not support video playback.
-  </video>
-  <a href="/">⬅ Back</a>
-</body>
-</html>
-"""
-
-# ---------- ROUTES ----------
-
+# ---------------- HOME (GRID OF CHANNELS) ----------------
 @app.route("/")
 def home():
-    return render_template_string(HOME_HTML, streams=YOUTUBE_STREAMS)
+    html = """
+    <html>
+    <head>
+        <title>Live TV</title>
+        <style>
+            body { font-family: sans-serif; text-align:center; background:#111; color:#fff; }
+            .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:20px; }
+            .card { background:#222; padding:20px; border-radius:10px; }
+            a { color:#0f0; text-decoration:none; font-size:18px; }
+            video { width:90%; max-width:600px; margin:20px auto; display:block; }
+        </style>
+    </head>
+    <body>
+        <h2>📺 Live TV Channels</h2>
+        <div class="grid">
+            {% for key in streams.keys() %}
+                <div class="card">
+                    <a href="/watch/{{ key }}">▶ {{ key.replace('_',' ').title() }}</a>
+                </div>
+            {% endfor %}
+        </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html, streams=STREAM_LINKS)
 
-@app.route("/yt/<station>")
-def yt(station):
-    if station not in YOUTUBE_STREAMS:
-        return "Channel not found", 404
+# ---------------- PLAYER ----------------
+@app.route("/watch/<channel>")
+def watch(channel):
+    if channel not in STREAM_LINKS:
+        abort(404)
+    stream_url = STREAM_LINKS[channel]
+    html = """
+    <html>
+    <head>
+        <title>{{ channel }}</title>
+        <style>
+            body { font-family:sans-serif; text-align:center; background:#000; color:#fff; }
+            video { width:95%; max-width:700px; margin:20px auto; display:block; }
+            a { color:#0f0; text-decoration:none; }
+        </style>
+    </head>
+    <body>
+        <h2>{{ channel.replace('_',' ').title() }}</h2>
+        <video controls autoplay>
+            <source src="{{ url }}" type="application/x-mpegURL">
+            Your browser does not support HLS.
+        </video>
+        <p><a href="/">⬅ Back to channels</a></p>
+    </body>
+    </html>
+    """
+    return render_template_string(html, channel=channel, url=stream_url)
 
-    yt_url = YOUTUBE_STREAMS[station]
 
-    # 🔹 Use yt-dlp to extract the best playable stream URL
-    cmd = ["yt-dlp", "-f", "bestaudio[ext=m4a]/best", "-g", yt_url]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    stream_url = result.stdout.strip()
-    if not stream_url:
-        return f"Stream unavailable: {result.stderr}", 503
-
-    # Instead of raw stream, embed in a player
-    return render_template_string(PLAYER_HTML, name=station.replace("_"," ").title(), url=stream_url)
-
-# ---------- MAIN ----------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
