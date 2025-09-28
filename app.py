@@ -102,7 +102,7 @@ def home():
     all_channels = tv_channels + live_youtube
 
     # Default TV logo
-    DEFAULT_TV_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/TV_icon_2.svg/512px-TV_icon_2.svg.png"
+    DEFAULT_TV_LOGO = "https://i.imgur.com/V8TVb6R.png"
     CHANNEL_LOGOS = {}
 
     # Assign default logo for all TV channels
