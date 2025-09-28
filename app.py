@@ -101,14 +101,15 @@ def home():
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
 
-    # Static TV logos
-    CHANNEL_LOGOS = {
-        "safari_tv": "https://upload.wikimedia.org/wikipedia/en/6/6d/Safari_TV.png",
-        "victers_tv": "https://victers.kite.kerala.gov.in/assets/img/logo.png",
-        "mazhavil_manorama": "https://upload.wikimedia.org/wikipedia/en/5/54/Mazhavil_Manorama_logo.png",
-    }
+    # Default TV logo
+    DEFAULT_TV_LOGO = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Television_icon.svg"
+    CHANNEL_LOGOS = {}
 
-    # Add YouTube logos dynamically (favicon API)
+    # Assign default logo for all TV channels
+    for key in TV_STREAMS.keys():
+        CHANNEL_LOGOS[key] = DEFAULT_TV_LOGO
+
+    # YouTube logos (via favicon API)
     for key, url in YOUTUBE_STREAMS.items():
         CHANNEL_LOGOS[key] = f"https://www.google.com/s2/favicons?domain={url}&sz=128"
 
