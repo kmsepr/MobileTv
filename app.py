@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from flask import Flask, Response, render_template_string, abort
-import subprocess, os, requests
+import subprocess, os, requests, random
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
@@ -12,9 +12,7 @@ app = Flask(__name__)
 # -----------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
-
-"victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
-
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
     "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
 }
 
@@ -98,9 +96,7 @@ def stream_proxy(url: str):
 # -----------------------
 @app.route("/")
 def home():
-    # TV always visible
     tv_channels = list(TV_STREAMS.keys())
-    # Only live YouTube channels
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
 
@@ -114,23 +110,49 @@ a { color:#0f0; display:block; margin:10px 0; font-size:24px; padding:10px; back
 a:hover { background:#333; }
 h2 { font-size:28px; text-align:center; margin-bottom:20px; }
 </style>
+<script>
+document.addEventListener("keydown", function(e) {
+    let links = document.querySelectorAll("a[data-index]");
+    if (!isNaN(e.key)) {
+        if (e.key === "0") {
+            // random channel
+            let rand = Math.floor(Math.random() * links.length);
+            window.location.href = links[rand].href;
+        } else {
+            let index = parseInt(e.key) - 1;
+            if (index >= 0 && index < links.length) {
+                window.location.href = links[index].href;
+            }
+        }
+    }
+});
+</script>
 </head>
 <body>
 <h2>📺 TV & YouTube Live</h2>
 {% for key in channels %}
-<a href="/watch/{{ key }}">[{{ loop.index }}] ▶ {{ key.replace('_',' ').title() }}</a>
+<a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">[{{ loop.index }}] ▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
 </body></html>"""
     return render_template_string(html, channels=all_channels)
 
 @app.route("/watch/<channel>")
 def watch(channel):
-    if channel not in TV_STREAMS and channel not in CACHE:
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = tv_channels + live_youtube
+
+    if channel not in all_channels:
         abort(404)
+
     if channel in TV_STREAMS:
         video_url = TV_STREAMS[channel]
     else:
         video_url = f"/stream/{channel}"
+
+    current_index = all_channels.index(channel)
+    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
+    next_channel = all_channels[(current_index + 1) % len(all_channels)]
 
     html = f"""
 <html>
@@ -142,6 +164,27 @@ body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
 video {{ width:95%; max-width:700px; }}
 a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration:none; }}
 </style>
+<script>
+document.addEventListener("keydown", function(e) {{
+    let vid = document.querySelector("video");
+    if (e.key === "4") {{
+        window.location.href = "/watch/{prev_channel}";
+    }}
+    if (e.key === "6") {{
+        window.location.href = "/watch/{next_channel}";
+    }}
+    if (e.key === "0") {{
+        window.location.href = "/";
+    }}
+    if (e.key === "5" && vid) {{
+        if (vid.paused) {{
+            vid.play();
+        }} else {{
+            vid.pause();
+        }}
+    }}
+}});
+</script>
 </head>
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
