@@ -39,12 +39,10 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
- 
-"kas_ranker": "https://www.youtube.com/@freepscclasses/live",
-
+    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
-CACHE = {}  # Stores direct YouTube live URLs
+CACHE = {}        # Stores direct YouTube live URLs
 LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
@@ -103,22 +101,37 @@ def home():
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
 
-    html = """<html>
+    # Static TV logos
+    CHANNEL_LOGOS = {
+        "safari_tv": "https://upload.wikimedia.org/wikipedia/en/6/6d/Safari_TV.png",
+        "victers_tv": "https://victers.kite.kerala.gov.in/assets/img/logo.png",
+        "mazhavil_manorama": "https://upload.wikimedia.org/wikipedia/en/5/54/Mazhavil_Manorama_logo.png",
+    }
+
+    # Add YouTube logos dynamically (favicon API)
+    for key, url in YOUTUBE_STREAMS.items():
+        CHANNEL_LOGOS[key] = f"https://www.google.com/s2/favicons?domain={url}&sz=128"
+
+    html = """
+<html>
 <head>
 <title>📺 TV & YouTube Live</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { font-family: sans-serif; background:#111; color:#fff; padding:10px; }
-a { color:#0f0; display:block; margin:10px 0; font-size:24px; padding:10px; background:#222; border-radius:8px; text-decoration:none; }
-a:hover { background:#333; }
+body { font-family: sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
 h2 { font-size:28px; text-align:center; margin-bottom:20px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:15px; }
+.card { background:#222; border-radius:10px; padding:10px; text-align:center; }
+.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
+.card span { display:block; font-size:14px; color:#0f0; }
+.card a { text-decoration:none; color:inherit; }
+.card:hover { background:#333; }
 </style>
 <script>
 document.addEventListener("keydown", function(e) {
     let links = document.querySelectorAll("a[data-index]");
     if (!isNaN(e.key)) {
         if (e.key === "0") {
-            // random channel
             let rand = Math.floor(Math.random() * links.length);
             window.location.href = links[rand].href;
         } else {
@@ -133,11 +146,19 @@ document.addEventListener("keydown", function(e) {
 </head>
 <body>
 <h2>📺 TV & YouTube Live</h2>
+<div class="grid">
 {% for key in channels %}
-<a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">[{{ loop.index }}] ▶ {{ key.replace('_',' ').title() }}</a>
+<div class="card">
+  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+    <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+  </a>
+</div>
 {% endfor %}
-</body></html>"""
-    return render_template_string(html, channels=all_channels)
+</div>
+</body>
+</html>"""
+    return render_template_string(html, channels=all_channels, logos=CHANNEL_LOGOS)
 
 @app.route("/watch/<channel>")
 def watch(channel):
