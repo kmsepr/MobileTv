@@ -120,37 +120,21 @@ h2 { font-size:28px; text-align:center; margin-bottom:20px; }
 {% for key in channels %}
 <a href="/watch/{{ key }}">[{{ loop.index }}] ▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
+
+<script>
+document.addEventListener("keydown", function(e) {
+    // Only handle number keys 1-9
+    if (e.key >= "1" && e.key <= "9") {
+        let idx = parseInt(e.key, 10) - 1; // array is 0-based
+        let links = document.querySelectorAll("a");
+        if (idx < links.length) {
+            window.location.href = links[idx].href;
+        }
+    }
+});
+</script>
+
 </body></html>"""
-    return render_template_string(html, channels=all_channels)
-
-@app.route("/watch/<channel>")
-def watch(channel):
-    if channel not in TV_STREAMS and channel not in CACHE:
-        abort(404)
-    if channel in TV_STREAMS:
-        video_url = TV_STREAMS[channel]
-    else:
-        video_url = f"/stream/{channel}"
-
-    html = f"""
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{channel.replace('_',' ').title()}</title>
-<style>
-body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
-video {{ width:95%; max-width:700px; }}
-a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration:none; }}
-</style>
-</head>
-<body>
-<h2>{channel.replace('_',' ').title()}</h2>
-<video controls autoplay>
-<source src="{video_url}" type="application/vnd.apple.mpegurl">
-</video>
-<a href='/'>⬅ Back</a>
-</body>
-</html>"""
     return html
 
 @app.route("/stream/<channel>")
