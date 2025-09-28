@@ -39,6 +39,9 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
+ 
+"kas_ranker": "https://www.youtube.com/@freepscclasses/live",
+
 }
 
 CACHE = {}  # Stores direct YouTube live URLs
