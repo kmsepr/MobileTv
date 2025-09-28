@@ -12,7 +12,9 @@ app = Flask(__name__)
 # -----------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
-    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
+
+"victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
+
     "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
 }
 
@@ -41,12 +43,12 @@ YOUTUBE_STREAMS = {
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
 }
 
-CACHE = {}
-LIVE_STATUS = {}
+CACHE = {}  # Stores direct YouTube live URLs
+LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube Live URL
+# Extract YouTube Live URL (raw HLS)
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
     try:
@@ -96,44 +98,29 @@ def stream_proxy(url: str):
 # -----------------------
 @app.route("/")
 def home():
+    # TV always visible
     tv_channels = list(TV_STREAMS.keys())
+    # Only live YouTube channels
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
 
-    html = """
-<html>
+    html = """<html>
 <head>
-<title>📺 Live Channels</title>
+<title>📺 TV & YouTube Live</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { font-family: sans-serif; background:#000; color:#0f0; padding:15px; text-align:center; }
-h2 { font-size:26px; margin-bottom:20px; }
-a { color:#0f0; display:block; margin:10px 0; font-size:22px; padding:10px; background:#111; border-radius:8px; text-decoration:none; }
-a:hover { background:#222; }
+body { font-family: sans-serif; background:#111; color:#fff; padding:10px; }
+a { color:#0f0; display:block; margin:10px 0; font-size:24px; padding:10px; background:#222; border-radius:8px; text-decoration:none; }
+a:hover { background:#333; }
+h2 { font-size:28px; text-align:center; margin-bottom:20px; }
 </style>
 </head>
 <body>
-<h2>📺 Live Channels</h2>
+<h2>📺 TV & YouTube Live</h2>
 {% for key in channels %}
 <a href="/watch/{{ key }}">[{{ loop.index }}] ▶ {{ key.replace('_',' ').title() }}</a>
 {% endfor %}
-
-<script>
-// Keypad shortcuts
-document.addEventListener("keydown", function(e) {
-    let links = document.querySelectorAll("a");
-    if (e.key >= "1" && e.key <= "9") {
-        let idx = parseInt(e.key, 10) - 1;
-        if (idx < links.length) window.location.href = links[idx].href;
-    }
-    if (e.key === "0") {
-        window.location.href = "/";
-    }
-});
-</script>
-
-</body>
-</html>"""
+</body></html>"""
     return render_template_string(html, channels=all_channels)
 
 @app.route("/watch/<channel>")
@@ -151,8 +138,8 @@ def watch(channel):
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{channel.replace('_',' ').title()}</title>
 <style>
-body {{ background:#000; color:#0f0; text-align:center; padding:10px; }}
-video {{ width:95%; max-width:700px; border:2px solid #0f0; border-radius:10px; }}
+body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
+video {{ width:95%; max-width:700px; }}
 a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration:none; }}
 </style>
 </head>
@@ -161,16 +148,7 @@ a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration
 <video controls autoplay>
 <source src="{video_url}" type="application/vnd.apple.mpegurl">
 </video>
-<a href='/'>⬅ Back (Press 0)</a>
-
-<script>
-document.addEventListener("keydown", function(e) {
-    if (e.key === "0") {
-        window.location.href = "/";
-    }
-});
-</script>
-
+<a href='/'>⬅ Back</a>
 </body>
 </html>"""
     return html
