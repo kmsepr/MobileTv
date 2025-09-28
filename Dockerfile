@@ -1,39 +1,25 @@
-# -----------------------
-# Base image
-# -----------------------
 FROM python:3.11-slim
 
-# -----------------------
-# Set working directory
-# -----------------------
+# Set workdir
 WORKDIR /app
 
-# -----------------------
-# Install system dependencies
-# -----------------------
+# Install system dependencies (ffmpeg for yt-dlp, curl useful for debugging)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ffmpeg curl wget build-essential && \
+    ffmpeg curl && \
     rm -rf /var/lib/apt/lists/*
 
-# -----------------------
-# Copy requirements & install Python packages
-# -----------------------
-COPY requirements.txt .
+# Upgrade pip and install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
 
-# -----------------------
-# Copy app
-# -----------------------
-COPY app.py .
+# Install app dependencies
+RUN pip install --no-cache-dir flask requests yt-dlp gunicorn
 
-# -----------------------
+# Copy your app code
+COPY . /app
+
 # Expose port
-# -----------------------
 EXPOSE 8000
 
-# -----------------------
-# Run app
-# -----------------------
-CMD ["python", "app.py"]
+# Start app with Gunicorn (2 workers, bind to all addresses)
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8000", "app:app"]
