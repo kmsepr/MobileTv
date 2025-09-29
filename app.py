@@ -104,7 +104,7 @@ def home():
     # Only YouTube channels will have logos
     CHANNEL_LOGOS = {}
     for key, url in YOUTUBE_STREAMS.items():
-        CHANNEL_LOGOS[key] = f"https://www.google.com/s2/favicons?domain={url}&sz=128"
+        CHANNEL_LOGOS[key] = "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg"
 
     html = """
 <html>
