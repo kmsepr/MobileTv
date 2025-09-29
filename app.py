@@ -11,22 +11,38 @@ app = Flask(__name__)
 # TV Streams (direct m3u8)
 # -----------------------
 TV_STREAMS = {
-    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/safari.stream/playlist.m3u8",
-    "reporter_tv": "https://livecdnh1.tvanywhere.ae/hls/reporter/05.m3u8",
-    "janam_tv": "https://streaming37.worldbbtv.com/hls/janam.m3u8",
-    "shalom_tv": "https://shalomtv.livebox.co.in/shalomtvhls/live.m3u8",
-    "powervision_tv": "https://powervision.suntechs.net/hls/powervision.m3u8",
+    
+"safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/victers/tv1/chunks.m3u8",
+    "kairali_we": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/wetv_nim_https/050522/wetv/playlist.m3u8",
+
+"mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8
+
 }
 
 # -----------------------
 # YouTube Live Streams
 # -----------------------
 YT_STREAMS = {
-    "asianet_news": "https://www.youtube.com/watch?v=j6sVti7q3kU",
-    "manorama_news": "https://www.youtube.com/watch?v=sB3gP3D94mQ",
-    "media_one": "https://www.youtube.com/watch?v=6u9b2vR0JZw",
-    "mathrubhumi_news": "https://www.youtube.com/watch?v=_9LomXqHO0Y",
-    "twentyfour_news": "https://www.youtube.com/watch?v=Kwq0EhOSAmk",
+     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+    "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
+    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
+    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
+    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
+    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
+    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
+    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
+    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
+    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
+    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
+    "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
+    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
+    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
+    "entri_app": "https://www.youtube.com/@entriapp/live",
+    "entri_ias": "https://www.youtube.com/@EntriIAS/live",
+    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
+    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
 }
 
 # -----------------------
