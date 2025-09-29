@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from flask import Flask, Response, render_template_string, abort
-import subprocess, os, requests, random
+import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
@@ -101,15 +101,8 @@ def home():
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
 
-    # Default TV logo
-    DEFAULT_TV_LOGO = "https://i.imgur.com/V8TVb6R.png"
+    # Only YouTube channels will have logos
     CHANNEL_LOGOS = {}
-
-    # Assign default logo for all TV channels
-    for key in TV_STREAMS.keys():
-        CHANNEL_LOGOS[key] = DEFAULT_TV_LOGO
-
-    # YouTube logos (via favicon API)
     for key, url in YOUTUBE_STREAMS.items():
         CHANNEL_LOGOS[key] = f"https://www.google.com/s2/favicons?domain={url}&sz=128"
 
@@ -151,7 +144,9 @@ document.addEventListener("keydown", function(e) {
 {% for key in channels %}
 <div class="card">
   <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
-    <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    {% if logos.get(key) %}
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    {% endif %}
     <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
