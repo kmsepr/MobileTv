@@ -182,7 +182,7 @@ def watch(channel):
 <style>
 body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
 video {{ width:95%; max-width:700px; }}
-a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration:none; }}
+a {{ color:#0f0; display:inline-block; margin:10px; font-size:20px; text-decoration:none; }}
 </style>
 <script>
 document.addEventListener("keydown", function(e) {{
@@ -203,6 +203,23 @@ document.addEventListener("keydown", function(e) {{
             vid.pause();
         }}
     }}
+    if (e.key === "9") {{
+        window.location.reload();
+    }}
+}});
+
+// Auto reload if stream stops or errors
+window.addEventListener("load", function() {{
+    let vid = document.querySelector("video");
+    if (!vid) return;
+    vid.addEventListener("error", function() {{
+        console.log("⚠️ Video error, reloading...");
+        setTimeout(() => window.location.reload(), 3000);
+    }});
+    vid.addEventListener("ended", function() {{
+        console.log("⚠️ Video ended, reloading...");
+        setTimeout(() => window.location.reload(), 3000);
+    }});
 }});
 </script>
 </head>
@@ -211,7 +228,10 @@ document.addEventListener("keydown", function(e) {{
 <video controls autoplay>
 <source src="{video_url}" type="application/vnd.apple.mpegurl">
 </video>
-<a href='/'>⬅ Back</a>
+<div style="margin-top:20px;">
+  <a href='/'>⬅ Back</a>
+  <a href='/watch/{channel}' style="color:#0ff;">🔄 Refresh</a>
+</div>
 </body>
 </html>"""
     return html
