@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from flask import Flask, Response, render_template_string, abort
-import subprocess, os, requests, random
+import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
@@ -11,20 +11,16 @@ app = Flask(__name__)
 # TV Streams (direct m3u8)
 # -----------------------
 TV_STREAMS = {
-    
-"safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
-    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/victers/tv1/chunks.m3u8",
-    "kairali_we": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/wetv_nim_https/050522/wetv/playlist.m3u8",
-
-"mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8
-
+    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
+    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
 }
 
 # -----------------------
 # YouTube Live Streams
 # -----------------------
-YT_STREAMS = {
-     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+YOUTUBE_STREAMS = {
+    "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
@@ -43,121 +39,189 @@ YT_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
+    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
-# -----------------------
-# FFmpeg Proxy Generator
-# -----------------------
-def generate_stream(url):
-    logging.info(f"Starting ffmpeg for: {url}")
-    process = subprocess.Popen(
-        [
-            "ffmpeg", "-i", url, "-c", "copy", "-f", "mpegts", "-preset", "veryfast", "pipe:1"
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL
-    )
-    try:
-        while True:
-            data = process.stdout.read(1024)
-            if not data:
-                break
-            yield data
-    finally:
-        process.kill()
+CACHE = {}        # Stores direct YouTube live URLs
+LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
+COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Routes
+# Extract YouTube Live URL (raw HLS)
+# -----------------------
+def get_youtube_live_url(youtube_url: str):
+    try:
+        cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", youtube_url]
+        if os.path.exists(COOKIES_FILE):
+            cmd.insert(1, "--cookies")
+            cmd.insert(2, COOKIES_FILE)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return None
+    except Exception:
+        return None
+
+# -----------------------
+# Refresh YouTube URLs
+# -----------------------
+def refresh_stream_urls():
+    while True:
+        logging.info("🔄 Refreshing YouTube live URLs...")
+        for name, url in YOUTUBE_STREAMS.items():
+            direct_url = get_youtube_live_url(url)
+            if direct_url:
+                CACHE[name] = direct_url
+                LIVE_STATUS[name] = True
+            else:
+                LIVE_STATUS[name] = False
+        time.sleep(60)
+
+threading.Thread(target=refresh_stream_urls, daemon=True).start()
+
+# -----------------------
+# Proxy YouTube HLS
+# -----------------------
+def stream_proxy(url: str):
+    try:
+        with requests.get(url, stream=True, timeout=10) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=4096):
+                if chunk:
+                    yield chunk
+    except Exception:
+        yield b""
+
+# -----------------------
+# Flask Routes
 # -----------------------
 @app.route("/")
-def index():
-    return render_template_string("""
-<!DOCTYPE html>
+def home():
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = tv_channels + live_youtube
+
+    # Only YouTube channels will have logos
+    CHANNEL_LOGOS = {}
+    for key, url in YOUTUBE_STREAMS.items():
+        CHANNEL_LOGOS[key] = f"https://www.google.com/s2/favicons?domain={url}&sz=128"
+
+    html = """
 <html>
 <head>
-  <title>TV + YouTube Streams</title>
-  <style>
-    body { font-family: sans-serif; background: #111; color: #eee; text-align: center; margin: 0; }
-    h2 { margin: 20px 0 10px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; padding: 10px; }
-    .card { background: #222; border-radius: 8px; padding: 10px; cursor: pointer; }
-    .card:hover { background: #444; }
-    video { width: 100%; max-height: 70vh; background: black; }
-  </style>
+<title>📺 TV & YouTube Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { font-family: sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
+h2 { font-size:28px; text-align:center; margin-bottom:20px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:15px; }
+.card { background:#222; border-radius:10px; padding:10px; text-align:center; }
+.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
+.card span { display:block; font-size:14px; color:#0f0; }
+.card a { text-decoration:none; color:inherit; }
+.card:hover { background:#333; }
+</style>
+<script>
+document.addEventListener("keydown", function(e) {
+    let links = document.querySelectorAll("a[data-index]");
+    if (!isNaN(e.key)) {
+        if (e.key === "0") {
+            let rand = Math.floor(Math.random() * links.length);
+            window.location.href = links[rand].href;
+        } else {
+            let index = parseInt(e.key) - 1;
+            if (index >= 0 && index < links.length) {
+                window.location.href = links[index].href;
+            }
+        }
+    }
+});
+</script>
 </head>
 <body>
-  <h1>📺 Live Streams</h1>
-
-  <video id="player" controls autoplay></video>
-
-  <h2>TV</h2>
-  <div class="grid">
-    {% for key, url in TV_STREAMS.items() %}
-      <div class="card" onclick="playStream('{{key}}')">{{ key.replace('_',' ') }}</div>
-    {% endfor %}
-  </div>
-
-  <h2>YouTube</h2>
-  <div class="grid">
-    {% for key, url in YT_STREAMS.items() %}
-      <div class="card" onclick="playStream('{{key}}')">{{ key.replace('_',' ') }}</div>
-    {% endfor %}
-  </div>
-
-  <script>
-    const player = document.getElementById("player");
-    const tv = {{ TV_STREAMS|tojson }};
-    const yt = {{ YT_STREAMS|tojson }};
-    let all = {...tv, ...yt};
-    let keys = Object.keys(all);
-    let index = 0;
-
-    function playStream(key) {
-      index = keys.indexOf(key);
-      if (tv[key]) player.src = tv[key];
-      else player.src = "/stream/" + key;
-    }
-
-    function playRandom() {
-      let r = keys[Math.floor(Math.random()*keys.length)];
-      playStream(r);
-    }
-
-    document.addEventListener("keydown", e => {
-      if (e.key === "0") playRandom();
-      else if (e.key >= "1" && e.key <= "9") {
-        let i = parseInt(e.key) - 1;
-        if (i < keys.length) playStream(keys[i]);
-      } else if (e.key === "4") {
-        index = (index - 1 + keys.length) % keys.length;
-        playStream(keys[index]);
-      } else if (e.key === "6") {
-        index = (index + 1) % keys.length;
-        playStream(keys[index]);
-      } else if (e.key === "5") {
-        if (player.paused) player.play(); else player.pause();
-      }
-    });
-
-    playRandom();
-  </script>
+<h2>📺 TV & YouTube Live</h2>
+<div class="grid">
+{% for key in channels %}
+<div class="card">
+  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+    {% if logos.get(key) %}
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    {% endif %}
+    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+  </a>
+</div>
+{% endfor %}
+</div>
 </body>
-</html>
-    """, TV_STREAMS=TV_STREAMS, YT_STREAMS=YT_STREAMS)
+</html>"""
+    return render_template_string(html, channels=all_channels, logos=CHANNEL_LOGOS)
+
+@app.route("/watch/<channel>")
+def watch(channel):
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = tv_channels + live_youtube
+
+    if channel not in all_channels:
+        abort(404)
+
+    if channel in TV_STREAMS:
+        video_url = TV_STREAMS[channel]
+    else:
+        video_url = f"/stream/{channel}"
+
+    current_index = all_channels.index(channel)
+    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
+    next_channel = all_channels[(current_index + 1) % len(all_channels)]
+
+    html = f"""
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{channel.replace('_',' ').title()}</title>
+<style>
+body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
+video {{ width:95%; max-width:700px; }}
+a {{ color:#0f0; display:block; margin-top:20px; font-size:20px; text-decoration:none; }}
+</style>
+<script>
+document.addEventListener("keydown", function(e) {{
+    let vid = document.querySelector("video");
+    if (e.key === "4") {{
+        window.location.href = "/watch/{prev_channel}";
+    }}
+    if (e.key === "6") {{
+        window.location.href = "/watch/{next_channel}";
+    }}
+    if (e.key === "0") {{
+        window.location.href = "/";
+    }}
+    if (e.key === "5" && vid) {{
+        if (vid.paused) {{
+            vid.play();
+        }} else {{
+            vid.pause();
+        }}
+    }}
+}});
+</script>
+</head>
+<body>
+<h2>{channel.replace('_',' ').title()}</h2>
+<video controls autoplay>
+<source src="{video_url}" type="application/vnd.apple.mpegurl">
+</video>
+<a href='/'>⬅ Back</a>
+</body>
+</html>"""
+    return html
 
 @app.route("/stream/<channel>")
-def stream_channel(channel):
-    if channel not in YT_STREAMS:
-        abort(404)
-    url = YT_STREAMS[channel]
-    ytdlp = subprocess.run(
-        ["yt-dlp", "-g", "-f", "best[ext=mp4]", url],
-        capture_output=True, text=True
-    )
-    direct_url = ytdlp.stdout.strip().split("\n")[-1]
-    if not direct_url:
-        abort(500)
-    return Response(generate_stream(direct_url), mimetype="video/mp2t")
+def stream(channel):
+    url = CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
+    return Response(stream_proxy(url), mimetype="application/vnd.apple.mpegurl")
 
 if __name__ == "__main__":
-    app.run(debug=True, threaded=True, port=8000)
+    app.run(host="0.0.0.0", port=8000, debug=False)
