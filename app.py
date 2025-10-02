@@ -45,6 +45,22 @@ YOUTUBE_STREAMS = {
     "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
+# -----------------------
+# Hardcoded Channel Logos
+# -----------------------
+CHANNEL_LOGOS = {
+    # TV Logos
+    "safari_tv": "https://i.imgur.com/dSOfYyh.png",
+    "victers_tv": "https://i.imgur.com/kj4OEsb.png",
+    "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
+    "france_24": "https://upload.wikimedia.org/wikipedia/commons/c/c1/France_24_logo_%282013%29.svg",
+    "aqsa_tv": "https://i.imgur.com/Z2rfrQ8.png",
+    "mazhavil_manorama": "https://i.imgur.com/fjgzW20.png",
+
+    # Default YouTube logo (replace with per-channel icons if available)
+    **{key: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for key in YOUTUBE_STREAMS}
+}
+
 CACHE = {}        # Stores direct YouTube live URLs
 LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
 COOKIES_FILE = "/mnt/data/cookies.txt"
@@ -103,11 +119,6 @@ def home():
     tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
-
-    # Only YouTube channels will have logos
-    CHANNEL_LOGOS = {}
-    for key, url in YOUTUBE_STREAMS.items():
-        CHANNEL_LOGOS[key] = "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg"
 
     html = """
 <html>
