@@ -131,9 +131,7 @@ def home():
 <style>
 body { font-family: sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
 h2 { font-size:24px; text-align:center; margin-bottom:15px; }
-.tabs { display:flex; justify-content:center; margin-bottom:15px; }
-.tab { padding:10px 20px; margin:0 5px; cursor:pointer; background:#222; border-radius:8px; }
-.tab.active { background:#0f0; color:#000; font-weight:bold; }
+.mode { text-align:center; font-size:18px; margin-bottom:10px; color:#0ff; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:15px; }
 .card { background:#222; border-radius:10px; padding:10px; text-align:center; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
@@ -143,32 +141,51 @@ h2 { font-size:24px; text-align:center; margin-bottom:15px; }
 .hidden { display:none; }
 </style>
 <script>
+let currentTab = "tv"; // default TV
+
 function showTab(tabName) {
-    document.querySelectorAll('.grid').forEach(el => el.classList.add('hidden'));
-    document.getElementById(tabName).classList.remove('hidden');
-    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-    document.getElementById(tabName+'-tab').classList.add('active');
+    document.getElementById("tv").classList.add("hidden");
+    document.getElementById("youtube").classList.add("hidden");
+    document.getElementById(tabName).classList.remove("hidden");
+    currentTab = tabName;
+    document.getElementById("mode").innerText = (tabName === "tv" ? "📺 TV Mode" : "▶ YouTube Mode");
 }
-// Default: show TV first
-window.onload = () => showTab('tv');
+
+document.addEventListener("keydown", function(e) {
+    if (e.key === "#") {
+        // toggle between TV and YouTube
+        showTab(currentTab === "tv" ? "youtube" : "tv");
+    } else if (!isNaN(e.key)) {
+        let grid = document.getElementById(currentTab);
+        let links = grid.querySelectorAll("a[data-index]");
+        if (e.key === "0") {
+            let rand = Math.floor(Math.random() * links.length);
+            if (links[rand]) window.location.href = links[rand].href;
+        } else {
+            let index = parseInt(e.key) - 1;
+            if (index >= 0 && index < links.length) {
+                window.location.href = links[index].href;
+            }
+        }
+    }
+});
+
+// default TV
+window.onload = () => showTab("tv");
 </script>
 </head>
 <body>
 <h2>📺 Live Channels</h2>
+<div id="mode" class="mode">📺 TV Mode</div>
 
-<div class="tabs">
-  <div id="tv-tab" class="tab" onclick="showTab('tv')">TV</div>
-  <div id="youtube-tab" class="tab" onclick="showTab('youtube')">YouTube</div>
-</div>
-
-<div id="tv" class="grid hidden">
+<div id="tv" class="grid">
 {% for key in tv_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}">
+  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
     {% if logos.get(key) %}
       <img src="{{ logos.get(key) }}" alt="{{ key }}">
     {% endif %}
-    <span>{{ key.replace('_',' ').title() }}</span>
+    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
 {% endfor %}
@@ -177,11 +194,11 @@ window.onload = () => showTab('tv');
 <div id="youtube" class="grid hidden">
 {% for key in youtube_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}">
+  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
     {% if logos.get(key) %}
       <img src="{{ logos.get(key) }}" alt="{{ key }}">
     {% endif %}
-    <span>{{ key.replace('_',' ').title() }}</span>
+    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
 {% endfor %}
