@@ -12,6 +12,7 @@ app = Flask(__name__)
 # -----------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "asianet_plus": "http://217.20.112.199/asianet/index.m3u8",
     "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
     "bloomberg_tv": "https://bloomberg-bloomberg-3-br.samsung.wurl.tv/manifest/playlist.m3u8",
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
@@ -60,6 +61,7 @@ CHANNEL_LOGOS = {
     "mazhavil_manorama": "https://i.imgur.com/fjgzW20.png",
     "dd_malayalam": "https://i.imgur.com/ywm2dTl.png",
     "dd_sports": "https://i.imgur.com/J2Ky5OO.png",
+    "asianet_plus": "https://i.imgur.com/qg1IhV8.png",
 
     # Default YouTube logo (replace with per-channel icons if available)
     **{key: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for key in YOUTUBE_STREAMS}
