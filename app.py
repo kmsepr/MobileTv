@@ -24,7 +24,7 @@ TV_STREAMS = {
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
     "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
     
-    "mubashir": "https://live2.cdnbridge.tv/AlmasirahMubasher/Mubasher_All/playlist.m3u8",
+   
     
 }
 
@@ -72,7 +72,6 @@ CHANNEL_LOGOS = {
     "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
     "al_sahat": "https://i.imgur.com/UVndAta.png",
     
-    "mubashir": "https://i.imgur.com/0xHb3XM.jpg",
 
     # Default YouTube logo (replace with per-channel icons if available)
     **{key: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for key in YOUTUBE_STREAMS}
