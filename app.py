@@ -20,7 +20,7 @@ TV_STREAMS = {
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
     "aqsa_tv": "http://167.172.161.13/hls/feedspare/6udfi7v8a3eof6nlps6e9ovfrs65c7l7.m3u8",
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
-    "el_medina": "https://dvrfl06.bozztv.com/astv-elmedina/index.m3u8",
+    "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     
 }
 
@@ -64,7 +64,7 @@ CHANNEL_LOGOS = {
     "dd_malayalam": "https://i.imgur.com/ywm2dTl.png",
     "dd_sports": "https://i.imgur.com/J2Ky5OO.png",
     "mult": "https://i.imgur.com/xi351Fx.png",
-    "el_medina": "https://i.imgur.com/qFinuvv.png",
+    "yemen_today": "https://i.imgur.com/8TzcJu5.png",
 
     # Default YouTube logo (replace with per-channel icons if available)
     **{key: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for key in YOUTUBE_STREAMS}
