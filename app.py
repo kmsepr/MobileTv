@@ -122,7 +122,6 @@ def stream_proxy(url: str):
 def home():
     tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
-    all_channels = tv_channels + live_youtube
 
     html = """
 <html>
@@ -131,48 +130,66 @@ def home():
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body { font-family: sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
-h2 { font-size:28px; text-align:center; margin-bottom:20px; }
+h2 { font-size:24px; text-align:center; margin-bottom:15px; }
+.tabs { display:flex; justify-content:center; margin-bottom:15px; }
+.tab { padding:10px 20px; margin:0 5px; cursor:pointer; background:#222; border-radius:8px; }
+.tab.active { background:#0f0; color:#000; font-weight:bold; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:15px; }
 .card { background:#222; border-radius:10px; padding:10px; text-align:center; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
 .card span { display:block; font-size:14px; color:#0f0; }
 .card a { text-decoration:none; color:inherit; }
 .card:hover { background:#333; }
+.hidden { display:none; }
 </style>
 <script>
-document.addEventListener("keydown", function(e) {
-    let links = document.querySelectorAll("a[data-index]");
-    if (!isNaN(e.key)) {
-        if (e.key === "0") {
-            let rand = Math.floor(Math.random() * links.length);
-            window.location.href = links[rand].href;
-        } else {
-            let index = parseInt(e.key) - 1;
-            if (index >= 0 && index < links.length) {
-                window.location.href = links[index].href;
-            }
-        }
-    }
-});
+function showTab(tabName) {
+    document.querySelectorAll('.grid').forEach(el => el.classList.add('hidden'));
+    document.getElementById(tabName).classList.remove('hidden');
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabName+'-tab').classList.add('active');
+}
+// Default: show TV first
+window.onload = () => showTab('tv');
 </script>
 </head>
 <body>
-<h2>📺 TV & YouTube Live</h2>
-<div class="grid">
-{% for key in channels %}
+<h2>📺 Live Channels</h2>
+
+<div class="tabs">
+  <div id="tv-tab" class="tab" onclick="showTab('tv')">TV</div>
+  <div id="youtube-tab" class="tab" onclick="showTab('youtube')">YouTube</div>
+</div>
+
+<div id="tv" class="grid hidden">
+{% for key in tv_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+  <a href="/watch/{{ key }}">
     {% if logos.get(key) %}
       <img src="{{ logos.get(key) }}" alt="{{ key }}">
     {% endif %}
-    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+    <span>{{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
 {% endfor %}
 </div>
+
+<div id="youtube" class="grid hidden">
+{% for key in youtube_channels %}
+<div class="card">
+  <a href="/watch/{{ key }}">
+    {% if logos.get(key) %}
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    {% endif %}
+    <span>{{ key.replace('_',' ').title() }}</span>
+  </a>
+</div>
+{% endfor %}
+</div>
+
 </body>
 </html>"""
-    return render_template_string(html, channels=all_channels, logos=CHANNEL_LOGOS)
+    return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
 
 @app.route("/watch/<channel>")
 def watch(channel):
