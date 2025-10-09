@@ -23,13 +23,10 @@ TV_STREAMS = {
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
     "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
-    
-   
-    
 }
 
 # -----------------------
-# YouTube Live Streams
+# YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
@@ -55,10 +52,9 @@ YOUTUBE_STREAMS = {
 }
 
 # -----------------------
-# Hardcoded Channel Logos
+# Channel Logos
 # -----------------------
 CHANNEL_LOGOS = {
-    # TV Logos
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
     "victers_tv": "https://i.imgur.com/kj4OEsb.png",
     "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
@@ -71,18 +67,15 @@ CHANNEL_LOGOS = {
     "yemen_today": "https://i.imgur.com/8TzcJu5.png",
     "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
     "al_sahat": "https://i.imgur.com/UVndAta.png",
-    
-
-    # Default YouTube logo (replace with per-channel icons if available)
-    **{key: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for key in YOUTUBE_STREAMS}
+    **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
 }
 
-CACHE = {}        # Stores direct YouTube live URLs
-LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
+CACHE = {}        # Cached YouTube direct HLS URLs
+LIVE_STATUS = {}  # Live status
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube Live URL (raw HLS)
+# Extract YouTube HLS URL
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
     try:
@@ -93,12 +86,12 @@ def get_youtube_live_url(youtube_url: str):
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-        return None
     except Exception:
-        return None
+        pass
+    return None
 
 # -----------------------
-# Refresh YouTube URLs
+# Background refresh thread
 # -----------------------
 def refresh_stream_urls():
     while True:
@@ -115,25 +108,12 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Proxy YouTube HLS
-# -----------------------
-def stream_proxy(url: str):
-    try:
-        with requests.get(url, stream=True, timeout=10) as r:
-            r.raise_for_status()
-            for chunk in r.iter_content(chunk_size=4096):
-                if chunk:
-                    yield chunk
-    except Exception:
-        yield b""
-
-# -----------------------
 # Flask Routes
 # -----------------------
 @app.route("/")
 def home():
     tv_channels = list(TV_STREAMS.keys())
-    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    live_youtube = [n for n, live in LIVE_STATUS.items() if live]
 
     html = """
 <html>
@@ -141,49 +121,35 @@ def home():
 <title>📺 TV & YouTube Live</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { font-family: sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
-h2 { font-size:24px; text-align:center; margin-bottom:15px; }
-.mode { text-align:center; font-size:18px; margin-bottom:10px; color:#0ff; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:15px; }
-.card { background:#222; border-radius:10px; padding:10px; text-align:center; }
-.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
-.card span { display:block; font-size:14px; color:#0f0; }
-.card a { text-decoration:none; color:inherit; }
+body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
+h2 { text-align:center; margin-bottom:10px; }
+.mode { text-align:center; color:#0ff; margin-bottom:10px; font-size:18px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; }
+.card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
 .card:hover { background:#333; }
+.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
+.card span { font-size:14px; color:#0f0; }
 .hidden { display:none; }
 </style>
 <script>
-let currentTab = "tv"; // default TV
-
-function showTab(tabName) {
-    document.getElementById("tv").classList.add("hidden");
-    document.getElementById("youtube").classList.add("hidden");
-    document.getElementById(tabName).classList.remove("hidden");
-    currentTab = tabName;
-    document.getElementById("mode").innerText = (tabName === "tv" ? "📺 TV Mode" : "▶ YouTube Mode");
+let currentTab="tv";
+function showTab(tab){
+  document.getElementById("tv").classList.add("hidden");
+  document.getElementById("youtube").classList.add("hidden");
+  document.getElementById(tab).classList.remove("hidden");
+  document.getElementById("mode").innerText=(tab==="tv"?"📺 TV Mode":"▶ YouTube Mode");
+  currentTab=tab;
 }
-
-document.addEventListener("keydown", function(e) {
-    if (e.key === "#") {
-        // toggle between TV and YouTube
-        showTab(currentTab === "tv" ? "youtube" : "tv");
-    } else if (!isNaN(e.key)) {
-        let grid = document.getElementById(currentTab);
-        let links = grid.querySelectorAll("a[data-index]");
-        if (e.key === "0") {
-            let rand = Math.floor(Math.random() * links.length);
-            if (links[rand]) window.location.href = links[rand].href;
-        } else {
-            let index = parseInt(e.key) - 1;
-            if (index >= 0 && index < links.length) {
-                window.location.href = links[index].href;
-            }
-        }
-    }
+document.addEventListener("keydown",function(e){
+  if(e.key==="#"){showTab(currentTab==="tv"?"youtube":"tv");}
+  else if(!isNaN(e.key)){
+    let grid=document.getElementById(currentTab);
+    let links=grid.querySelectorAll("a[data-index]");
+    if(e.key==="0"){let r=Math.floor(Math.random()*links.length);if(links[r])window.location.href=links[r].href;}
+    else{let i=parseInt(e.key)-1;if(i>=0&&i<links.length)window.location.href=links[i].href;}
+  }
 });
-
-// default TV
-window.onload = () => showTab("tv");
+window.onload=()=>showTab("tv");
 </script>
 </head>
 <body>
@@ -194,9 +160,7 @@ window.onload = () => showTab("tv");
 {% for key in tv_channels %}
 <div class="card">
   <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
-    {% if logos.get(key) %}
-      <img src="{{ logos.get(key) }}" alt="{{ key }}">
-    {% endif %}
+    <img src="{{ logos.get(key) }}">
     <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
@@ -207,33 +171,28 @@ window.onload = () => showTab("tv");
 {% for key in youtube_channels %}
 <div class="card">
   <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
-    {% if logos.get(key) %}
-      <img src="{{ logos.get(key) }}" alt="{{ key }}">
-    {% endif %}
+    <img src="{{ logos.get(key) }}">
     <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
 {% endfor %}
 </div>
-
 </body>
 </html>"""
     return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
 
+# -----------------------
+# Watch Route (HLS.js Player)
+# -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
     tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
-
     if channel not in all_channels:
         abort(404)
 
-    if channel in TV_STREAMS:
-        video_url = TV_STREAMS[channel]
-    else:
-        video_url = f"/stream/{channel}"
-
+    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
@@ -243,69 +202,70 @@ def watch(channel):
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{channel.replace('_',' ').title()}</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
-body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
-video {{ width:95%; max-width:700px; }}
-a {{ color:#0f0; display:inline-block; margin:10px; font-size:20px; text-decoration:none; }}
+body {{ background:#000; color:#fff; text-align:center; margin:0; padding:10px; }}
+video {{ width:95%; max-width:720px; height:auto; background:#000; border:1px solid #333; }}
+a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-size:18px; }}
 </style>
 <script>
-document.addEventListener("keydown", function(e) {{
-    let vid = document.querySelector("video");
-    if (e.key === "4") {{
-        window.location.href = "/watch/{prev_channel}";
-    }}
-    if (e.key === "6") {{
-        window.location.href = "/watch/{next_channel}";
-    }}
-    if (e.key === "0") {{
-        window.location.href = "/";
-    }}
-    if (e.key === "5" && vid) {{
-        if (vid.paused) {{
-            vid.play();
-        }} else {{
-            vid.pause();
-        }}
-    }}
-    if (e.key === "9") {{
-        window.location.reload();
-    }}
+document.addEventListener("DOMContentLoaded", function() {{
+  const video = document.getElementById("player");
+  const src = "{video_url}";
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+    video.src = src;
+  }} else if (Hls.isSupported()) {{
+    const hls = new Hls({{lowLatencyMode:true}});
+    hls.loadSource(src);
+    hls.attachMedia(video);
+  }} else {{
+    alert("⚠️ Browser cannot play HLS stream.");
+  }}
 }});
-
-// Auto reload if stream stops or errors
-window.addEventListener("load", function() {{
-    let vid = document.querySelector("video");
-    if (!vid) return;
-    vid.addEventListener("error", function() {{
-        console.log("⚠️ Video error, reloading...");
-        setTimeout(() => window.location.reload(), 3000);
-    }});
-    vid.addEventListener("ended", function() {{
-        console.log("⚠️ Video ended, reloading...");
-        setTimeout(() => window.location.reload(), 3000);
-    }});
+document.addEventListener("keydown", function(e) {{
+  const v=document.getElementById("player");
+  if(e.key==="4")window.location.href="/watch/{prev_channel}";
+  if(e.key==="6")window.location.href="/watch/{next_channel}";
+  if(e.key==="0")window.location.href="/";
+  if(e.key==="5"&&v){{v.paused?v.play():v.pause();}}
+  if(e.key==="9")window.location.reload();
 }});
 </script>
 </head>
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
-<video controls autoplay>
-<source src="{video_url}" type="application/vnd.apple.mpegurl">
-</video>
-<div style="margin-top:20px;">
-  <a href='/'>⬅ Back</a>
-  <a href='/watch/{channel}' style="color:#0ff;">🔄 Refresh</a>
+<video id="player" controls autoplay playsinline></video>
+<div style="margin-top:15px;">
+  <a href="/">⬅ Home</a>
+  <a href="/watch/{prev_channel}">⏮ Prev</a>
+  <a href="/watch/{next_channel}">⏭ Next</a>
+  <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
 </div>
 </body>
 </html>"""
     return html
 
+# -----------------------
+# Proxy Stream (YouTube)
+# -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
     url = CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
-    return Response(stream_proxy(url), mimetype="application/vnd.apple.mpegurl")
 
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        return f"Error fetching stream: {e}", 502
+
+    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
+    return Response(r.content, content_type=content_type)
+
+# -----------------------
+# Run Server
+# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
