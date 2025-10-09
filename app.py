@@ -23,6 +23,9 @@ TV_STREAMS = {
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
     "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
+    
+   
+    
 }
 
 # -----------------------
@@ -55,6 +58,7 @@ YOUTUBE_STREAMS = {
 # Hardcoded Channel Logos
 # -----------------------
 CHANNEL_LOGOS = {
+    # TV Logos
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
     "victers_tv": "https://i.imgur.com/kj4OEsb.png",
     "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
@@ -67,11 +71,14 @@ CHANNEL_LOGOS = {
     "yemen_today": "https://i.imgur.com/8TzcJu5.png",
     "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
     "al_sahat": "https://i.imgur.com/UVndAta.png",
+    
+
+    # Default YouTube logo (replace with per-channel icons if available)
     **{key: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for key in YOUTUBE_STREAMS}
 }
 
-CACHE = {}
-LIVE_STATUS = {}
+CACHE = {}        # Stores direct YouTube live URLs
+LIVE_STATUS = {}  # Tracks which YouTube streams are currently live
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
@@ -91,7 +98,7 @@ def get_youtube_live_url(youtube_url: str):
         return None
 
 # -----------------------
-# Background refresher thread
+# Refresh YouTube URLs
 # -----------------------
 def refresh_stream_urls():
     while True:
@@ -108,7 +115,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Proxy HLS
+# Proxy YouTube HLS
 # -----------------------
 def stream_proxy(url: str):
     try:
@@ -121,7 +128,7 @@ def stream_proxy(url: str):
         yield b""
 
 # -----------------------
-# Main UI
+# Flask Routes
 # -----------------------
 @app.route("/")
 def home():
@@ -131,101 +138,168 @@ def home():
     html = """
 <html>
 <head>
-<title>SPB TV Style</title>
+<title>📺 TV & YouTube Live</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { background:#222; color:#fff; font-family:sans-serif; margin:0; padding:0; text-align:center; }
-.container { width:320px; height:240px; margin:20px auto; border:2px solid #444; background:#111; display:flex; flex-direction:column; border-radius:10px; overflow:hidden; }
-.video-box { flex:3; background:#000; }
-iframe { width:100%; height:100%; border:none; }
-.info-bar { flex:0.8; background:#036; font-size:13px; display:flex; align-items:center; justify-content:center; color:#fff; }
-.channel-bar { flex:1.2; background:#ddd; overflow-x:auto; white-space:nowrap; }
-.channel-btn { display:inline-block; width:60px; text-align:center; padding:5px; background:#fff; border-right:1px solid #aaa; }
-.channel-btn img { width:40px; height:30px; object-fit:contain; }
-.channel-btn span { display:block; font-size:10px; color:#000; }
+body { font-family: sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
+h2 { font-size:24px; text-align:center; margin-bottom:15px; }
+.mode { text-align:center; font-size:18px; margin-bottom:10px; color:#0ff; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:15px; }
+.card { background:#222; border-radius:10px; padding:10px; text-align:center; }
+.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
+.card span { display:block; font-size:14px; color:#0f0; }
+.card a { text-decoration:none; color:inherit; }
+.card:hover { background:#333; }
 .hidden { display:none; }
-.mode { text-align:center; font-size:16px; color:#0ff; margin-bottom:8px; }
 </style>
 <script>
-let tv_channels = {{ tv_channels|tojson }};
-let yt_channels = {{ youtube_channels|tojson }};
-let mode = "tv";
-let current = 0;
+let currentTab = "tv"; // default TV
 
-function showMode(m) {
-  mode = m;
-  document.getElementById("tv_box").classList.add("hidden");
-  document.getElementById("yt_box").classList.add("hidden");
-  document.getElementById(m + "_box").classList.remove("hidden");
-  document.getElementById("mode").innerText = (m === "tv" ? "📺 TV Mode" : "▶ YouTube Mode");
-  playChannel(0);
+function showTab(tabName) {
+    document.getElementById("tv").classList.add("hidden");
+    document.getElementById("youtube").classList.add("hidden");
+    document.getElementById(tabName).classList.remove("hidden");
+    currentTab = tabName;
+    document.getElementById("mode").innerText = (tabName === "tv" ? "📺 TV Mode" : "▶ YouTube Mode");
 }
 
-function playChannel(i) {
-  current = i;
-  let arr = (mode === "tv" ? tv_channels : yt_channels);
-  let name = arr[i];
-  let iframe = document.getElementById("player");
-  iframe.src = "/watch_inline/" + name;
-  document.getElementById("info").innerText = name.replaceAll("_"," ").toUpperCase();
-}
-
-document.addEventListener("keydown", e=>{
-  let arr = (mode === "tv" ? tv_channels : yt_channels);
-  if(e.key === "#"){ showMode(mode === "tv" ? "yt" : "tv"); }
-  if(e.key === "4"){ playChannel((current-1+arr.length)%arr.length); }
-  if(e.key === "6"){ playChannel((current+1)%arr.length); }
-  if(!isNaN(e.key)){ playChannel(parseInt(e.key)%arr.length); }
+document.addEventListener("keydown", function(e) {
+    if (e.key === "#") {
+        // toggle between TV and YouTube
+        showTab(currentTab === "tv" ? "youtube" : "tv");
+    } else if (!isNaN(e.key)) {
+        let grid = document.getElementById(currentTab);
+        let links = grid.querySelectorAll("a[data-index]");
+        if (e.key === "0") {
+            let rand = Math.floor(Math.random() * links.length);
+            if (links[rand]) window.location.href = links[rand].href;
+        } else {
+            let index = parseInt(e.key) - 1;
+            if (index >= 0 && index < links.length) {
+                window.location.href = links[index].href;
+            }
+        }
+    }
 });
 
-window.onload = ()=>showMode("tv");
+// default TV
+window.onload = () => showTab("tv");
 </script>
 </head>
 <body>
-<h2 id="mode" class="mode">📺 TV Mode</h2>
-<div class="container">
-  <div class="video-box"><iframe id="player"></iframe></div>
-  <div id="info" class="info-bar">Loading...</div>
+<h2>📺 Live Channels</h2>
+<div id="mode" class="mode">📺 TV Mode</div>
 
-  <div id="tv_box" class="channel-bar">
-  {% for key in tv_channels %}
-    <div class="channel-btn" onclick="playChannel({{ loop.index0 }})">
-      <img src="{{ logos.get(key) }}">
-      <span>{{ loop.index }}</span>
-    </div>
-  {% endfor %}
-  </div>
-
-  <div id="yt_box" class="channel-bar hidden">
-  {% for key in youtube_channels %}
-    <div class="channel-btn" onclick="playChannel({{ loop.index0 }})">
-      <img src="{{ logos.get(key) }}">
-      <span>{{ loop.index }}</span>
-    </div>
-  {% endfor %}
-  </div>
+<div id="tv" class="grid">
+{% for key in tv_channels %}
+<div class="card">
+  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+    {% if logos.get(key) %}
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    {% endif %}
+    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+  </a>
 </div>
+{% endfor %}
+</div>
+
+<div id="youtube" class="grid hidden">
+{% for key in youtube_channels %}
+<div class="card">
+  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+    {% if logos.get(key) %}
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+    {% endif %}
+    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+  </a>
+</div>
+{% endfor %}
+</div>
+
 </body>
-</html>
-"""
+</html>"""
     return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
 
-# -----------------------
-# Inline player
-# -----------------------
-@app.route("/watch_inline/<channel>")
-def watch_inline(channel):
-    if channel in TV_STREAMS:
-        src = TV_STREAMS[channel]
-    elif channel in CACHE:
-        src = f"/stream/{channel}"
-    else:
-        return "Not live", 503
-    return f"<video controls autoplay width='100%' height='100%'><source src='{src}' type='application/vnd.apple.mpegurl'></video>"
+@app.route("/watch/<channel>")
+def watch(channel):
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = tv_channels + live_youtube
 
-# -----------------------
-# Stream proxy for YouTube
-# -----------------------
+    if channel not in all_channels:
+        abort(404)
+
+    if channel in TV_STREAMS:
+        video_url = TV_STREAMS[channel]
+    else:
+        video_url = f"/stream/{channel}"
+
+    current_index = all_channels.index(channel)
+    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
+    next_channel = all_channels[(current_index + 1) % len(all_channels)]
+
+    html = f"""
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{channel.replace('_',' ').title()}</title>
+<style>
+body {{ background:#000; color:#fff; text-align:center; padding:10px; }}
+video {{ width:95%; max-width:700px; }}
+a {{ color:#0f0; display:inline-block; margin:10px; font-size:20px; text-decoration:none; }}
+</style>
+<script>
+document.addEventListener("keydown", function(e) {{
+    let vid = document.querySelector("video");
+    if (e.key === "4") {{
+        window.location.href = "/watch/{prev_channel}";
+    }}
+    if (e.key === "6") {{
+        window.location.href = "/watch/{next_channel}";
+    }}
+    if (e.key === "0") {{
+        window.location.href = "/";
+    }}
+    if (e.key === "5" && vid) {{
+        if (vid.paused) {{
+            vid.play();
+        }} else {{
+            vid.pause();
+        }}
+    }}
+    if (e.key === "9") {{
+        window.location.reload();
+    }}
+}});
+
+// Auto reload if stream stops or errors
+window.addEventListener("load", function() {{
+    let vid = document.querySelector("video");
+    if (!vid) return;
+    vid.addEventListener("error", function() {{
+        console.log("⚠️ Video error, reloading...");
+        setTimeout(() => window.location.reload(), 3000);
+    }});
+    vid.addEventListener("ended", function() {{
+        console.log("⚠️ Video ended, reloading...");
+        setTimeout(() => window.location.reload(), 3000);
+    }});
+}});
+</script>
+</head>
+<body>
+<h2>{channel.replace('_',' ').title()}</h2>
+<video controls autoplay>
+<source src="{video_url}" type="application/vnd.apple.mpegurl">
+</video>
+<div style="margin-top:20px;">
+  <a href='/'>⬅ Back</a>
+  <a href='/watch/{channel}' style="color:#0ff;">🔄 Refresh</a>
+</div>
+</body>
+</html>"""
+    return html
+
 @app.route("/stream/<channel>")
 def stream(channel):
     url = CACHE.get(channel)
@@ -233,8 +307,5 @@ def stream(channel):
         return "Channel not ready", 503
     return Response(stream_proxy(url), mimetype="application/vnd.apple.mpegurl")
 
-# -----------------------
-# Run server
-# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
