@@ -111,19 +111,12 @@ def refresh_stream_urls():
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
-# --- NEW AUDIO STREAMING FUNCTION ---
+# --- AUDIO STREAMING FUNCTION ---
 def generate_audio_stream(source_url, channel_name):
     """Generates an audio stream (MP3, 40kbps, mono) from a video source using FFmpeg."""
     logging.info(f"Starting FFmpeg for audio stream: {channel_name} (Source: {source_url})")
     
-    # FFmpeg command:
-    # -i {source_url}: Input stream
-    # -vn: No video output
-    # -c:a libmp3lame: Use LAME for MP3 encoding
-    # -b:a 40k: Audio bitrate 40kbps
-    # -ac 1: Mono audio channel
-    # -f mp3: Output format MP3
-    # pipe:1: Output to stdout
+    # FFmpeg command: -i {source_url} -vn -c:a libmp3lame -b:a 40k -ac 1 -f mp3 pipe:1
     ffmpeg_command = [
         "ffmpeg", 
         "-loglevel", "error", 
@@ -137,16 +130,13 @@ def generate_audio_stream(source_url, channel_name):
     ]
     
     try:
-        # Start the FFmpeg subprocess
         process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # Stream the output chunk by chunk
         for chunk in iter(lambda: process.stdout.read(4096), b''):
             if not chunk:
                 break
             yield chunk
             
-        # Wait for the process to finish and check for errors
         process.wait()
         stderr_output = process.stderr.read().decode('utf-8')
         
@@ -178,7 +168,7 @@ def home():
 body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
 h2 { text-align:center; margin-bottom:10px; }
 .mode { text-align:center; color:#0ff; margin-bottom:10px; font-size:18px; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; margin-bottom: 20px;}
 .card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
 .card:hover { background:#333; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
@@ -190,16 +180,27 @@ h2 { text-align:center; margin-bottom:10px; }
 <script>
 let currentTab="tv";
 function showTab(tab){
-  document.getElementById("tv").classList.add("hidden");
-  document.getElementById("youtube").classList.add("hidden");
-  document.getElementById(tab).classList.remove("hidden");
-  document.getElementById("mode").innerText=(tab==="tv"?"📺 TV Mode":"▶ YouTube Mode");
+  // Now only update the mode indicator, since both grids are always visible
+  // The 'tab' system is maintained for the key navigation logic below
+  document.getElementById("mode").innerText=(tab==="tv"?"📺 TV Mode - TV Channels":"▶ YouTube Mode - Live Channels");
   currentTab=tab;
 }
 document.addEventListener("keydown",function(e){
+  // Switching between TV and YouTube for the key navigation context
   if(e.key==="#"){showTab(currentTab==="tv"?"youtube":"tv");}
   else if(!isNaN(e.key)){
-    let grid=document.getElementById(currentTab);
+    let grid_id = currentTab;
+    // Special case to allow key navigation for both on the first load without pressing #
+    if(e.key==="1" && currentTab==="tv"){
+        // Check if the first channel is in the TV list
+        let tv_links = document.getElementById("tv").querySelectorAll("a[data-index]");
+        if(tv_links.length > 0) {
+            window.location.href=tv_links[0].href;
+            return;
+        }
+    }
+    
+    let grid=document.getElementById(grid_id);
     let links=grid.querySelectorAll("a[data-index]");
     if(e.key==="0"){let r=Math.floor(Math.random()*links.length);if(links[r])window.location.href=links[r].href;}
     else{let i=parseInt(e.key)-1;if(i>=0&&i<links.length)window.location.href=links[i].href;}
@@ -210,8 +211,9 @@ window.onload=()=>showTab("tv");
 </head>
 <body>
 <h2>📺 Live Channels</h2>
-<div id="mode" class="mode">📺 TV Mode</div>
+<div id="mode" class="mode">📺 TV Mode - TV Channels</div>
 
+<h3>TV Channels</h3>
 <div id="tv" class="grid">
 {% for key in tv_channels %}
 <div class="card">
@@ -226,8 +228,8 @@ window.onload=()=>showTab("tv");
 {% endfor %}
 </div>
 
-<div id="youtube" class="grid hidden">
-{% for key in youtube_channels %}
+<h3>YouTube Live</h3>
+<div id="youtube" class="grid"> {% for key in youtube_channels %}
 <div class="card">
   <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
     <img src="{{ logos.get(key) }}">
@@ -254,7 +256,6 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
-    # Note: /stream/{channel} is used for YouTube channels to get the HLS proxy
     video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
@@ -331,7 +332,7 @@ def stream(channel):
     return Response(stream_with_context(r.iter_content(chunk_size=4096)), content_type=content_type)
 
 # -----------------------
-# NEW: Audio Stream Route (40kbps Mono MP3)
+# Audio Stream Route (40kbps Mono MP3)
 # -----------------------
 @app.route("/audio/<channel>")
 def audio_stream(channel):
@@ -366,7 +367,6 @@ def audio_stream(channel):
 # Run Server
 # -----------------------
 if __name__ == "__main__":
-    # Ensure time is imported for the refresh_stream_urls thread
     if 'time' not in globals():
         import time 
         
