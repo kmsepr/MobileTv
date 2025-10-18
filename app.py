@@ -1,8 +1,9 @@
 import time
 import threading
 import logging
-from flask import Flask, Response, render_template_string, abort
+from flask import Flask, Response, render_template_string, abort, stream_with_context
 import subprocess, os, requests
+import re # Import re for sanitizing channel name for filename
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
@@ -79,6 +80,7 @@ COOKIES_FILE = "/mnt/data/cookies.txt"
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
     try:
+        # Use yt-dlp to get the direct stream URL, prioritizing low-resolution video stream
         cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", youtube_url]
         if os.path.exists(COOKIES_FILE):
             cmd.insert(1, "--cookies")
@@ -86,8 +88,8 @@ def get_youtube_live_url(youtube_url: str):
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"Error getting YouTube URL for {youtube_url}: {e}")
     return None
 
 # -----------------------
@@ -102,11 +104,63 @@ def refresh_stream_urls():
                 CACHE[name] = direct_url
                 LIVE_STATUS[name] = True
             else:
-                LIVE_STATUS[name] = False
+                # If cached URL exists, keep it in case of transient failure, but mark as potentially offline
+                if name not in CACHE:
+                     LIVE_STATUS[name] = False
         time.sleep(60)
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
+# --- NEW AUDIO STREAMING FUNCTION ---
+def generate_audio_stream(source_url, channel_name):
+    """Generates an audio stream (MP3, 40kbps, mono) from a video source using FFmpeg."""
+    logging.info(f"Starting FFmpeg for audio stream: {channel_name} (Source: {source_url})")
+    
+    # FFmpeg command:
+    # -i {source_url}: Input stream
+    # -vn: No video output
+    # -c:a libmp3lame: Use LAME for MP3 encoding
+    # -b:a 40k: Audio bitrate 40kbps
+    # -ac 1: Mono audio channel
+    # -f mp3: Output format MP3
+    # pipe:1: Output to stdout
+    ffmpeg_command = [
+        "ffmpeg", 
+        "-loglevel", "error", 
+        "-i", source_url, 
+        "-vn", 
+        "-c:a", "libmp3lame", 
+        "-b:a", "40k", 
+        "-ac", "1", 
+        "-f", "mp3", 
+        "pipe:1"
+    ]
+    
+    try:
+        # Start the FFmpeg subprocess
+        process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Stream the output chunk by chunk
+        for chunk in iter(lambda: process.stdout.read(4096), b''):
+            if not chunk:
+                break
+            yield chunk
+            
+        # Wait for the process to finish and check for errors
+        process.wait()
+        stderr_output = process.stderr.read().decode('utf-8')
+        
+        if process.returncode != 0:
+            logging.error(f"FFmpeg failed for {channel_name} (Return Code: {process.returncode}): {stderr_output}")
+        else:
+            logging.info(f"FFmpeg stream finished for {channel_name} gracefully.")
+
+    except FileNotFoundError:
+        logging.critical("FFmpeg is not installed or not in PATH.")
+        raise
+    except Exception as e:
+        logging.error(f"Error during audio stream generation for {channel_name}: {e}")
+        
 # -----------------------
 # Flask Routes
 # -----------------------
@@ -129,6 +183,8 @@ h2 { text-align:center; margin-bottom:10px; }
 .card:hover { background:#333; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
 .card span { font-size:14px; color:#0f0; }
+.action-links { margin-top: 5px; font-size: 12px; }
+.action-links a { color: #f0f; margin: 0 5px; text-decoration: underline; display: inline; }
 .hidden { display:none; }
 </style>
 <script>
@@ -163,6 +219,9 @@ window.onload=()=>showTab("tv");
     <img src="{{ logos.get(key) }}">
     <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
+  <div class="action-links">
+    <a href="/audio/{{ key }}">🎧 Audio</a>
+  </div>
 </div>
 {% endfor %}
 </div>
@@ -174,6 +233,9 @@ window.onload=()=>showTab("tv");
     <img src="{{ logos.get(key) }}">
     <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
   </a>
+  <div class="action-links">
+    <a href="/audio/{{ key }}">🎧 Audio</a>
+  </div>
 </div>
 {% endfor %}
 </div>
@@ -192,6 +254,7 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
+    # Note: /stream/{channel} is used for YouTube channels to get the HLS proxy
     video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
@@ -240,6 +303,7 @@ document.addEventListener("keydown", function(e) {{
   <a href="/watch/{prev_channel}">⏮ Prev</a>
   <a href="/watch/{next_channel}">⏭ Next</a>
   <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
+  <a href="/audio/{channel}" style="color:#f0f;">🎧 Audio</a>
 </div>
 </body>
 </html>"""
@@ -254,18 +318,56 @@ def stream(channel):
     if not url:
         return "Channel not ready", 503
 
+    # Directly proxy the YouTube HLS stream
     headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        r = requests.get(url, headers=headers, timeout=10, stream=True)
         r.raise_for_status()
     except Exception as e:
+        logging.error(f"Error fetching YouTube HLS proxy: {e}")
         return f"Error fetching stream: {e}", 502
 
     content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
-    return Response(r.content, content_type=content_type)
+    return Response(stream_with_context(r.iter_content(chunk_size=4096)), content_type=content_type)
+
+# -----------------------
+# NEW: Audio Stream Route (40kbps Mono MP3)
+# -----------------------
+@app.route("/audio/<channel>")
+def audio_stream(channel):
+    # Determine the source URL
+    if channel in TV_STREAMS:
+        source_url = TV_STREAMS[channel]
+    elif channel in YOUTUBE_STREAMS:
+        # For YouTube, use the cached direct HLS URL
+        source_url = CACHE.get(channel)
+        if not source_url:
+            if LIVE_STATUS.get(channel, False) is False:
+                 return f"YouTube channel '{channel.replace('_',' ').title()}' is not currently live or URL not cached.", 503
+            else:
+                 return f"YouTube channel '{channel.replace('_',' ').title()}' URL not cached yet. Try again in a minute.", 503
+    else:
+        abort(404)
+
+    # Sanitize channel name for Content-Disposition filename
+    sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '', channel)
+    
+    # Use stream_with_context to ensure Flask's request context is maintained
+    return Response(
+        stream_with_context(generate_audio_stream(source_url, channel)),
+        mimetype="audio/mpeg", 
+        headers={
+            "Content-Type": "audio/mpeg",
+            "Content-Disposition": f"attachment; filename={sanitized_name}.mp3"
+        }
+    )
 
 # -----------------------
 # Run Server
 # -----------------------
 if __name__ == "__main__":
+    # Ensure time is imported for the refresh_stream_urls thread
+    if 'time' not in globals():
+        import time 
+        
     app.run(host="0.0.0.0", port=8000, debug=False)
