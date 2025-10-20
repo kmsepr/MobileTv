@@ -100,22 +100,7 @@ def generate_stream(station_name):
     buffer = deque(maxlen=2000)  # ~2 min buffer
 
     while True:
-        process = subprocess.Popen(
-            [
-    "ffmpeg",
-    "-reconnect", "1",
-    "-reconnect_streamed", "1",
-    "-reconnect_delay_max", "10",
-    "-user_agent", "Mozilla/5.0",
-    "-i", url,
-    "-vn",
-    "-ac", "1",
-    "-b:a", "40k",
-    "-f", "mp3",
-    "-"
-],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
-        )
+        process = subprocess.Popen( [ "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10", "-timeout", "5000000", "-user_agent", "Mozilla/5.0", "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "1M", "-f", "mp3", "-" ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096 )
 
         logging.info(f"🎵 Streaming {station_name}")
 
