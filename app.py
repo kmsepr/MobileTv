@@ -37,39 +37,34 @@ YOUTUBE_STREAMS = {
     "movie_kalyanaraman": "https://www.youtube.com/watch?v=e_bMbcZt9b4"
 }
 
-# ------------------------------------------------
-# 🌐 Cache for storing direct stream URLs
-# ------------------------------------------------
 CACHE = {}
+last_update = {}
 
 
 def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
         command = ["/usr/local/bin/yt-dlp", "-f", "91", "-g", youtube_url]
-
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
 
         result = subprocess.run(command, capture_output=True, text=True)
-
         if result.returncode == 0:
             return result.stdout.strip()
         else:
-            logging.error(f"Error extracting YouTube audio: {result.stderr}")
+            logging.error(f"yt-dlp error: {result.stderr}")
             return None
-    except Exception:
-        logging.exception("Exception while extracting YouTube audio")
+    except Exception as e:
+        logging.exception("Exception extracting YouTube audio")
         return None
 
 
 def refresh_stream_urls():
-    """Refresh all stream URLs every 30 minutes."""
-    last_update = {}
-
+    """Background thread: refreshes all streams every 30 minutes."""
+    global CACHE, last_update
     while True:
-        logging.info("🔄 Refreshing stream URLs...")
+        logging.info("🔄 Refreshing all YouTube audio URLs...")
         for name, yt_url in YOUTUBE_STREAMS.items():
             now = time.time()
             if name not in last_update or now - last_update[name] > 1800:
@@ -77,16 +72,23 @@ def refresh_stream_urls():
                 if url:
                     CACHE[name] = url
                     last_update[name] = now
-                    logging.info(f"✅ Updated {name}: {url}")
+                    logging.info(f"✅ {name} refreshed.")
                 else:
-                    logging.warning(f"❌ Failed to update {name}")
+                    logging.warning(f"❌ Could not refresh {name}")
         time.sleep(60)
 
 
-# ------------------------------------------------
-# Start background updater thread
-# ------------------------------------------------
-threading.Thread(target=refresh_stream_urls, daemon=True).start()
+def init_cache():
+    """Populate cache once at startup."""
+    logging.info("⚙️ Initializing YouTube audio URLs...")
+    for name, yt_url in YOUTUBE_STREAMS.items():
+        url = get_youtube_audio_url(yt_url)
+        if url:
+            CACHE[name] = url
+            last_update[name] = time.time()
+            logging.info(f"✅ Loaded {name}")
+        else:
+            logging.warning(f"⚠️ Failed initial load: {name}")
 
 
 def generate_stream(url):
@@ -113,21 +115,17 @@ def generate_stream(url):
             bufsize=4096
         )
 
-        logging.info(f"🎵 Streaming from: {url}")
-
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
                 time.sleep(0.02)
         except GeneratorExit:
-            logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
             process.wait()
             break
         except Exception as e:
             logging.error(f"Stream error: {e}")
 
-        logging.warning("⚠️ FFmpeg stopped, restarting stream...")
         process.terminate()
         process.wait()
         time.sleep(5)
@@ -135,7 +133,6 @@ def generate_stream(url):
 
 @app.route("/")
 def home():
-    """Homepage listing all stations."""
     html = """
     <!DOCTYPE html>
     <html>
@@ -143,12 +140,12 @@ def home():
         <title>YouTube Live Audio Streams</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: Arial, sans-serif; background: #111; color: #eee; text-align: center; margin: 0; }
-            h1 { color: #0ff; margin-top: 20px; }
-            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 20px; }
-            a { display: block; padding: 10px; background: #222; border-radius: 10px; color: #0ff; text-decoration: none; transition: 0.2s; }
-            a:hover { background: #0ff; color: #111; }
-            footer { margin: 20px; font-size: 14px; color: #777; }
+            body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin:0; }
+            h1 { color:#0ff; margin-top:20px; }
+            .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; padding:20px; }
+            a { display:block; padding:10px; background:#222; border-radius:10px; color:#0ff; text-decoration:none; transition:0.2s; }
+            a:hover { background:#0ff; color:#111; }
+            footer { margin:20px; font-size:14px; color:#777; }
         </style>
     </head>
     <body>
@@ -167,12 +164,23 @@ def home():
 
 @app.route("/<station_name>")
 def stream(station_name):
-    """Serve the requested station as a live stream."""
+    """Serve station stream."""
     url = CACHE.get(station_name)
     if not url:
-        return "Station not found or not yet available", 404
+        logging.warning(f"URL missing for {station_name}, retrying...")
+        yt_url = YOUTUBE_STREAMS.get(station_name)
+        if yt_url:
+            url = get_youtube_audio_url(yt_url)
+            if url:
+                CACHE[station_name] = url
+            else:
+                return "Stream temporarily unavailable. Try again later.", 503
+        else:
+            return "Station not found", 404
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
 
 if __name__ == "__main__":
+    init_cache()  # 👈 Ensure CACHE is populated before start
+    threading.Thread(target=refresh_stream_urls, daemon=True).start()
     app.run(host="0.0.0.0", port=8000, debug=False)
