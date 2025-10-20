@@ -70,8 +70,8 @@ CHANNEL_LOGOS = {
     **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
 }
 
-CACHE = {}        # Cached YouTube direct HLS URLs
-LIVE_STATUS = {}  # Live status
+CACHE = {}
+LIVE_STATUS = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
@@ -108,7 +108,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Flask Routes
+# Home Page (with visible tabs)
 # -----------------------
 @app.route("/")
 def home():
@@ -121,10 +121,12 @@ def home():
 <title>📺 TV & YouTube Live</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:20px; }
-h2 { text-align:center; margin-bottom:10px; }
-.mode { text-align:center; color:#0ff; margin-bottom:10px; font-size:18px; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; }
+body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:0; }
+h2 { text-align:center; margin:10px 0; }
+.tabs { display:flex; justify-content:center; background:#000; padding:10px; }
+.tab { padding:10px 20px; cursor:pointer; background:#222; color:#0ff; border-radius:10px; margin:0 5px; transition:0.2s; }
+.tab.active { background:#0ff; color:#000; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; padding:10px; }
 .card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
 .card:hover { background:#333; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
@@ -132,36 +134,27 @@ h2 { text-align:center; margin-bottom:10px; }
 .hidden { display:none; }
 </style>
 <script>
-let currentTab="tv";
 function showTab(tab){
-  document.getElementById("tv").classList.add("hidden");
-  document.getElementById("youtube").classList.add("hidden");
-  document.getElementById(tab).classList.remove("hidden");
-  document.getElementById("mode").innerText=(tab==="tv"?"📺 TV Mode":"▶ YouTube Mode");
-  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.grid').forEach(g=>g.classList.add('hidden'));
+  document.getElementById(tab).classList.remove('hidden');
+  document.getElementById('tab_'+tab).classList.add('active');
 }
-document.addEventListener("keydown",function(e){
-  if(e.key==="#"){showTab(currentTab==="tv"?"youtube":"tv");}
-  else if(!isNaN(e.key)){
-    let grid=document.getElementById(currentTab);
-    let links=grid.querySelectorAll("a[data-index]");
-    if(e.key==="0"){let r=Math.floor(Math.random()*links.length);if(links[r])window.location.href=links[r].href;}
-    else{let i=parseInt(e.key)-1;if(i>=0&&i<links.length)window.location.href=links[i].href;}
-  }
-});
-window.onload=()=>showTab("tv");
+window.onload=()=>showTab('tv');
 </script>
 </head>
 <body>
-<h2>📺 Live Channels</h2>
-<div id="mode" class="mode">📺 TV Mode</div>
+<div class="tabs">
+  <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV</div>
+  <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube</div>
+</div>
 
 <div id="tv" class="grid">
 {% for key in tv_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+  <a href="/watch/{{ key }}">
     <img src="{{ logos.get(key) }}">
-    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+    <span>{{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
 {% endfor %}
@@ -170,19 +163,20 @@ window.onload=()=>showTab("tv");
 <div id="youtube" class="grid hidden">
 {% for key in youtube_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}" data-index="{{ loop.index0 }}">
+  <a href="/watch/{{ key }}">
     <img src="{{ logos.get(key) }}">
-    <span>[{{ loop.index }}] {{ key.replace('_',' ').title() }}</span>
+    <span>{{ key.replace('_',' ').title() }}</span>
   </a>
 </div>
 {% endfor %}
 </div>
 </body>
-</html>"""
+</html>
+"""
     return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
 
 # -----------------------
-# Watch Route (HLS.js Player)
+# Watch Route
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
@@ -246,7 +240,7 @@ document.addEventListener("keydown", function(e) {{
     return html
 
 # -----------------------
-# Proxy Stream (YouTube)
+# Proxy Stream
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
