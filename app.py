@@ -44,25 +44,44 @@ YOUTUBE_STREAMS = {
 CACHE = {}
 
 
-def get_youtube_audio_url(youtube_url):
-    """Extracts direct audio stream URL from YouTube Live."""
+def get_youtube_live_url(youtube_url: str):
+    """
+    Extract direct playable URL from a YouTube Live channel.
+    Prioritizes low-bitrate audio for stability.
+    """
     try:
-        command = ["/usr/local/bin/yt-dlp", "-f", "91", "-g", youtube_url]
+        # Prefer audio-only m4a (lightweight), fallback to best
+        cmd = [
+            "yt-dlp",
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
+            "-g",
+            "--no-warnings",
+            "--geo-bypass",
+            "--live-from-start",
+            youtube_url,
+        ]
 
-        if os.path.exists("/mnt/data/cookies.txt"):
-            command.insert(2, "--cookies")
-            command.insert(3, "/mnt/data/cookies.txt")
+        if os.path.exists(COOKIES_FILE):
+            cmd[1:1] = ["--cookies", COOKIES_FILE]
 
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
 
-        if result.returncode == 0:
-            return result.stdout.strip()
+        if result.returncode == 0 and result.stdout.strip():
+            url = result.stdout.strip()
+            # yt-dlp sometimes returns multiple lines (audio+video); take the first
+            if "\n" in url:
+                url = url.split("\n")[0].strip()
+            logging.info(f"✅ Extracted YouTube stream URL: {url[:80]}...")
+            return url
         else:
-            logging.error(f"Error extracting YouTube audio: {result.stderr}")
-            return None
+            err = result.stderr.strip()
+            logging.warning(f"⚠️ yt-dlp failed for {youtube_url}: {err}")
+    except subprocess.TimeoutExpired:
+        logging.error(f"⏳ yt-dlp timeout for {youtube_url}")
     except Exception as e:
-        logging.exception("Exception while extracting YouTube audio")
-        return None
+        logging.error(f"❌ Exception while fetching YouTube URL for {youtube_url}: {e}")
+
+    return None
 
 
 def refresh_stream_urls():
