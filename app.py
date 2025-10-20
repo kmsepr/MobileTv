@@ -3,7 +3,7 @@ import threading
 import os
 import logging
 import subprocess
-from flask import Flask, Response
+from flask import Flask, Response, render_template_string
 
 # ------------------------------------------------
 # Logging setup
@@ -34,7 +34,6 @@ YOUTUBE_STREAMS = {
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    # Malayalam full movie
     "movie_kalyanaraman": "https://www.youtube.com/watch?v=e_bMbcZt9b4"
 }
 
@@ -134,12 +133,44 @@ def generate_stream(url):
         time.sleep(5)
 
 
+@app.route("/")
+def home():
+    """Homepage listing all stations."""
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>YouTube Live Audio Streams</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body { font-family: Arial, sans-serif; background: #111; color: #eee; text-align: center; margin: 0; }
+            h1 { color: #0ff; margin-top: 20px; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 20px; }
+            a { display: block; padding: 10px; background: #222; border-radius: 10px; color: #0ff; text-decoration: none; transition: 0.2s; }
+            a:hover { background: #0ff; color: #111; }
+            footer { margin: 20px; font-size: 14px; color: #777; }
+        </style>
+    </head>
+    <body>
+        <h1>📡 YouTube Live Audio Streams</h1>
+        <div class="grid">
+            {% for name in streams %}
+                <a href="/{{ name }}" target="_blank">{{ name.replace('_', ' ').title() }}</a>
+            {% endfor %}
+        </div>
+        <footer>Powered by Flask + FFmpeg + yt-dlp</footer>
+    </body>
+    </html>
+    """
+    return render_template_string(html, streams=YOUTUBE_STREAMS.keys())
+
+
 @app.route("/<station_name>")
 def stream(station_name):
     """Serve the requested station as a live stream."""
     url = CACHE.get(station_name)
     if not url:
-        return "Station not found or not available", 404
+        return "Station not found or not yet available", 404
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
 
