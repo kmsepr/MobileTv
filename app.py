@@ -11,8 +11,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 app = Flask(__name__)
 
 # ------------------------------------------------
-# TV STREAMS (DIRECT M3U8)
-# (unchanged - kept intact)
+# TV STREAMS (unchanged)
 # ------------------------------------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
@@ -31,7 +30,6 @@ TV_STREAMS = {
 
 # ------------------------------------------------
 # YOUTUBE LIVE CHANNELS
-# (unchanged - kept intact)
 # ------------------------------------------------
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
@@ -75,8 +73,8 @@ CHANNEL_LOGOS = {
     **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
 }
 
-CACHE = {}        # Cached YouTube direct HLS URLs
-LIVE_STATUS = {}  # Live status flags
+CACHE = {}
+LIVE_STATUS = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # ------------------------------------------------
@@ -105,9 +103,10 @@ def refresh_stream_urls():
             if direct_url:
                 CACHE[name] = direct_url
                 LIVE_STATUS[name] = True
+                logging.info(f"✅ Cached {name}")
             else:
-                if name not in CACHE:
-                    LIVE_STATUS[name] = False
+                LIVE_STATUS[name] = False
+                logging.warning(f"❌ Offline: {name}")
         time.sleep(60)
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
@@ -117,16 +116,17 @@ threading.Thread(target=refresh_stream_urls, daemon=True).start()
 # ------------------------------------------------
 def generate_audio_stream(source_url, channel_name, chunk_size=4096, reconnect_delay=2):
     """
-    Yield mp3 bytes from an ffmpeg subprocess.
-    - Redirect stderr to DEVNULL to avoid unbounded memory use.
-    - Kill the subprocess cleanly on client disconnect (GeneratorExit).
-    - If ffmpeg exits, retry after a small delay (auto-reconnect / repeat).
+    Stream MP3 audio (40 kbps) with auto-reconnect and no mini-loop issue.
     """
-    logging.info(f"Starting FFmpeg loop for {channel_name} -> {source_url}")
+    logging.info(f"🎧 Starting FFmpeg for {channel_name}")
 
     while True:
         ffmpeg_command = [
             "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-fflags", "+nobuffer+genpts+discardcorrupt",
+            "-avoid_negative_ts", "1",
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "10",
@@ -134,52 +134,40 @@ def generate_audio_stream(source_url, channel_name, chunk_size=4096, reconnect_d
             "-i", source_url,
             "-vn",
             "-ac", "1",
-            "-b:a", "40k",
-            "-bufsize", "1M",
+            "-ar", "44100",
+            "-b:a", "40k",   # 40 kbps audio bitrate
             "-f", "mp3",
             "-"
         ]
         try:
-            # stderr to DEVNULL avoids collecting large stderr output in memory.
             process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            for chunk in iter(lambda: process.stdout.read(chunk_size), b''):
+                if not chunk:
+                    break
+                yield chunk
 
+        except GeneratorExit:
+            logging.info(f"Client disconnected from {channel_name}")
             try:
-                for chunk in iter(lambda: process.stdout.read(chunk_size), b''):
-                    # If client disconnected, GeneratorExit will be raised by Flask
-                    # and we handle it below to kill the process.
-                    if not chunk:
-                        break
-                    yield chunk
-            except GeneratorExit:
-                # Client disconnected: ensure ffmpeg is killed and exit generator.
-                try:
-                    process.kill()
-                except Exception:
-                    pass
-                raise
-            except Exception as e:
-                logging.error(f"Stream read error for {channel_name}: {e}")
-            finally:
-                # Ensure process is cleaned up
-                try:
-                    process.stdout.close()
-                except Exception:
-                    pass
-                process.wait()
-
-            # If ffmpeg exited for any reason, wait a moment and restart (repeat behavior)
-            logging.warning(f"FFmpeg exited for {channel_name}, restarting in {reconnect_delay}s...")
-            time.sleep(reconnect_delay)
-
-        except FileNotFoundError:
-            logging.critical("FFmpeg not found in PATH.")
-            raise
+                process.kill()
+            except Exception:
+                pass
+            break
         except Exception as e:
-            logging.error(f"Error launching ffmpeg for {channel_name}: {e}")
+            logging.error(f"Stream error for {channel_name}: {e}")
             time.sleep(reconnect_delay)
+        finally:
+            try:
+                process.terminate()
+                process.wait(timeout=2)
+            except Exception:
+                pass
+
+        logging.warning(f"⚠️ Restarting FFmpeg for {channel_name} in {reconnect_delay}s...")
+        time.sleep(reconnect_delay)
 
 # ------------------------------------------------
-# FLASK ROUTES (kept intact)
+# FLASK ROUTES
 # ------------------------------------------------
 @app.route("/")
 def home():
@@ -187,8 +175,7 @@ def home():
     live_youtube = [n for n, live in LIVE_STATUS.items() if live]
 
     html = """
-    <html>
-    <head>
+    <html><head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📺 Live Channels</title>
     <style>
@@ -197,8 +184,7 @@ def home():
     .card{background:#222;border-radius:10px;padding:10px;text-align:center;}
     .card img{width:100%;height:80px;object-fit:contain;}
     a{color:#0f0;text-decoration:none;}
-    </style>
-    </head>
+    </style></head>
     <body>
     <h2>📺 TV Channels</h2>
     <div class="grid">
@@ -224,7 +210,7 @@ def home():
 
 @app.route("/watch/<channel>")
 def watch(channel):
-    all_channels = list(TV_STREAMS.keys()) + [n for n, live in LIVE_STATUS.items() if live]
+    all_channels = list(TV_STREAMS.keys()) + list(YOUTUBE_STREAMS.keys())
     if channel not in all_channels:
         abort(404)
     src = TV_STREAMS.get(channel, f"/stream/{channel}")
@@ -255,36 +241,28 @@ def stream(channel):
 
 @app.route("/audio/<channel>")
 def audio_stream(channel):
-    # Determine the source URL
     if channel in TV_STREAMS:
         source_url = TV_STREAMS[channel]
     elif channel in YOUTUBE_STREAMS:
-        # For YouTube, use the cached direct HLS URL
         source_url = CACHE.get(channel)
         if not source_url:
-            if LIVE_STATUS.get(channel, False) is False:
-                 return f"YouTube channel '{channel.replace('_',' ').title()}' is not currently live or URL not cached.", 503
-            else:
-                 return f"YouTube channel '{channel.replace('_',' ').title()}' URL not cached yet. Try again later.", 503
+            return f"YouTube '{channel.replace('_',' ').title()}' not live yet.", 503
     else:
         abort(404)
 
-    # Sanitize channel name for Content-Disposition filename
-    sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '', channel)
-
-    # Return streaming response; set inline so browser plays instead of downloads
+    safe_name = re.sub(r'[^a-zA-Z0-9_]', '', channel)
     return Response(
         stream_with_context(generate_audio_stream(source_url, channel)),
         mimetype="audio/mpeg",
         headers={
-            "Content-Disposition": f"inline; filename={sanitized_name}.mp3",
+            "Content-Disposition": f"inline; filename={safe_name}.mp3",
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
         }
     )
 
 # ------------------------------------------------
-# RUN SERVER (local dev)
+# RUN SERVER
 # ------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
