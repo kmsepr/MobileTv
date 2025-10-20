@@ -4,23 +4,17 @@ import threading
 import os
 import logging
 from flask import Flask, Response, render_template_string
-from collections import deque
 
-# -----------------------
 # Configure logging
-# -----------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 app = Flask(__name__)
 
-# -----------------------
-# YouTube Live Streams
-# -----------------------
+# 📡 List of YouTube Live Streams
 YOUTUBE_STREAMS = {
+     "asianet_news": "https://www.youtube.com/@asianetnews/live",
+
+
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-
-"asianet_news": "https://www.youtube.com/@asianetnews/live",
-
-
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
@@ -41,151 +35,122 @@ YOUTUBE_STREAMS = {
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live"
 }
 
-# -----------------------
-# Cache for direct stream URLs
-# -----------------------
+# 🌐 Cache for storing direct stream URLs
 CACHE = {}
 
-# -----------------------
-# Extract YouTube audio URL
-# -----------------------
 def get_youtube_audio_url(youtube_url):
-    """Get direct audio URL from YouTube live."""
+    """Extracts direct audio stream URL from YouTube Live."""
     try:
-        command = ["yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
+        command = ["/usr/local/bin/yt-dlp", "--force-generic-extractor", "-f", "91", "-g", youtube_url]
+
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
+
         result = subprocess.run(command, capture_output=True, text=True)
+
         if result.returncode == 0:
             return result.stdout.strip()
         else:
-            logging.error(f"yt-dlp error: {result.stderr.strip()}")
+            logging.error(f"Error extracting YouTube audio: {result.stderr}")
             return None
-    except Exception:
+    except Exception as e:
         logging.exception("Exception while extracting YouTube audio")
         return None
 
-# -----------------------
-# Refresh stream URLs every 60s
-# -----------------------
 def refresh_stream_urls():
+    """Refresh all stream URLs every 30 minutes."""
     last_update = {}
+
     while True:
-        logging.info("🔄 Refreshing YouTube stream URLs...")
-        now = time.time()
-        for name, url in YOUTUBE_STREAMS.items():
-            if name not in last_update or now - last_update[name] > 60:
-                direct_url = get_youtube_audio_url(url)
-                if direct_url:
-                    CACHE[name] = direct_url
+        logging.info("🔄 Refreshing stream URLs...")
+
+        for name, yt_url in YOUTUBE_STREAMS.items():
+            now = time.time()
+            if name not in last_update or now - last_update[name] > 1800:
+                url = get_youtube_audio_url(yt_url)
+                if url:
+                    CACHE[name] = url
                     last_update[name] = now
-                    logging.info(f"✅ Updated {name}")
+                    logging.info(f"✅ Updated {name}: {url}")
                 else:
                     logging.warning(f"❌ Failed to update {name}")
-        time.sleep(60)
 
+        time.sleep(60)  # Check every minute
+
+# Start background thread
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
-# -----------------------
-# Stream generator
-# -----------------------
-def generate_stream(station_name):
-    """Yield MP3 chunks using FFmpeg with reconnect."""
-    url = CACHE.get(station_name)
-    if not url:
-        logging.warning(f"No cached URL for {station_name}")
-        return
-
-    buffer = deque(maxlen=2000)  # ~2 min buffer
-
+def generate_stream(url):
+    """Streams audio using FFmpeg and auto-reconnects."""
     while True:
-        process = subprocess.Popen( [ "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10", "-timeout", "5000000", "-user_agent", "Mozilla/5.0", "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-bufsize", "1M", "-f", "mp3", "-" ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096 )
+        process = subprocess.Popen(
+            [
+    "ffmpeg", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10",
+    "-timeout", "5000000", "-user_agent", "Mozilla/5.0",
+    "-i", url,
+    "-vn",                   # no video
+    "-ac", "1",              # mono audio
+    "-ar", "22050",          # lower sample rate (optional for more compression)
+    "-b:a", "40k",           # reduced audio bitrate
+    "-bufsize", "64k",       # smaller buffer for low-speed links
+    "-f", "mp3", "-"
+],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096
+        )
 
-        logging.info(f"🎵 Streaming {station_name}")
+        logging.info(f"🎵 Streaming from: {url}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
-                buffer.append(chunk)
-                if buffer:
-                    yield buffer.popleft()
-                else:
-                    time.sleep(0.05)
+                yield chunk
+                time.sleep(0.02)  # Slight delay helps reduce CPU spikes and avoid buffer overrun
         except GeneratorExit:
-            logging.info(f"❌ Client disconnected from {station_name}")
+            logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
             process.wait()
             break
         except Exception as e:
             logging.error(f"Stream error: {e}")
 
-        logging.warning(f"⚠️ FFmpeg stopped for {station_name}, restarting...")
+        logging.warning("⚠️ FFmpeg stopped, restarting stream...")
         process.terminate()
         process.wait()
         time.sleep(5)
 
-# -----------------------
-# Stream route
-# -----------------------
 @app.route("/<station_name>")
 def stream(station_name):
+    """Serve the requested station as a live stream."""
     url = CACHE.get(station_name)
+
     if not url:
         return "Station not found or not available", 404
-    return Response(generate_stream(station_name), mimetype="audio/mpeg")
 
-# -----------------------
-# Homepage
-# -----------------------
+    return Response(generate_stream(url), mimetype="audio/mpeg")
+
 @app.route("/")
 def index():
-    # Only show channels with active stream URLs
-    live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
-    sorted_live = sorted(live_channels.keys())
-
     html = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>YouTube Live Audio Streams</title>
-      <style>
-        body { font-family: sans-serif; padding: 10px; background: #fff; }
-        a { display: block; margin: 5px 0; font-weight: bold; color: blue; text-decoration: underline; cursor: pointer; }
-        a:hover { color: red; }
-        .live { color: red; font-weight: bold; margin-left: 5px; }
-      </style>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <title>Live Audio Streams</title>
     </head>
     <body>
-      <h3>🎵 Currently Live Streams</h3>
+        <h3>Live Streams</h3>
     """
 
-    # JS keypad map
-    keypad_map = {}
-    for idx, name in enumerate(sorted_live, 1):
-        display_name = name.replace("_", " ").title()
-        html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
-        key = str(idx % 10)  # 1-9, 0
-        keypad_map[key] = name
+    for name in YOUTUBE_STREAMS:
+        display_name = name.replace('_', ' ').title()
+        html += f'<div><a href="/{name}">{display_name}</a></div>'
 
-    html += f"""
-    <script>
-    const streamMap = {keypad_map};
-    document.addEventListener("keydown", function(e) {{
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-        const key = e.key;
-        if (key in streamMap) {{
-            window.location.href = '/' + streamMap[key];
-        }}
-    }});
-    </script>
-    </body></html>
+    html += """
+    </body>
+    </html>
     """
     return render_template_string(html)
 
-# -----------------------
-# Run Flask
-# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
