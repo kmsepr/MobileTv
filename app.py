@@ -6,10 +6,9 @@ import subprocess
 from flask import Flask, Response, render_template_string
 
 # ------------------------------------------------
-# Logging setup
+# Configure logging
 # ------------------------------------------------
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 app = Flask(__name__)
 
 # ------------------------------------------------
@@ -34,37 +33,45 @@ YOUTUBE_STREAMS = {
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
+
+    # Malayalam full movie channel example
     "movie_kalyanaraman": "https://www.youtube.com/watch?v=e_bMbcZt9b4"
 }
 
+# ------------------------------------------------
+# 🌐 Cache for storing direct stream URLs
+# ------------------------------------------------
 CACHE = {}
-last_update = {}
 
 
 def get_youtube_audio_url(youtube_url):
     """Extracts direct audio stream URL from YouTube Live."""
     try:
         command = ["/usr/local/bin/yt-dlp", "-f", "91", "-g", youtube_url]
+
         if os.path.exists("/mnt/data/cookies.txt"):
             command.insert(2, "--cookies")
             command.insert(3, "/mnt/data/cookies.txt")
 
         result = subprocess.run(command, capture_output=True, text=True)
+
         if result.returncode == 0:
             return result.stdout.strip()
         else:
-            logging.error(f"yt-dlp error: {result.stderr}")
+            logging.error(f"Error extracting YouTube audio: {result.stderr}")
             return None
     except Exception as e:
-        logging.exception("Exception extracting YouTube audio")
+        logging.exception("Exception while extracting YouTube audio")
         return None
 
 
 def refresh_stream_urls():
-    """Background thread: refreshes all streams every 30 minutes."""
-    global CACHE, last_update
+    """Refresh all stream URLs every 30 minutes."""
+    last_update = {}
+
     while True:
-        logging.info("🔄 Refreshing all YouTube audio URLs...")
+        logging.info("🔄 Refreshing stream URLs...")
+
         for name, yt_url in YOUTUBE_STREAMS.items():
             now = time.time()
             if name not in last_update or now - last_update[name] > 1800:
@@ -72,23 +79,17 @@ def refresh_stream_urls():
                 if url:
                     CACHE[name] = url
                     last_update[name] = now
-                    logging.info(f"✅ {name} refreshed.")
+                    logging.info(f"✅ Updated {name}: {url}")
                 else:
-                    logging.warning(f"❌ Could not refresh {name}")
-        time.sleep(60)
+                    logging.warning(f"❌ Failed to update {name}")
+
+        time.sleep(60)  # Check every minute
 
 
-def init_cache():
-    """Populate cache once at startup."""
-    logging.info("⚙️ Initializing YouTube audio URLs...")
-    for name, yt_url in YOUTUBE_STREAMS.items():
-        url = get_youtube_audio_url(yt_url)
-        if url:
-            CACHE[name] = url
-            last_update[name] = time.time()
-            logging.info(f"✅ Loaded {name}")
-        else:
-            logging.warning(f"⚠️ Failed initial load: {name}")
+# ------------------------------------------------
+# Start background thread
+# ------------------------------------------------
+threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 
 def generate_stream(url):
@@ -115,72 +116,73 @@ def generate_stream(url):
             bufsize=4096
         )
 
+        logging.info(f"🎵 Streaming from: {url}")
+
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
                 yield chunk
                 time.sleep(0.02)
         except GeneratorExit:
+            logging.info("❌ Client disconnected. Stopping FFmpeg process...")
             process.terminate()
             process.wait()
             break
         except Exception as e:
             logging.error(f"Stream error: {e}")
 
+        logging.warning("⚠️ FFmpeg stopped, restarting stream...")
         process.terminate()
         process.wait()
         time.sleep(5)
 
 
+# ------------------------------------------------
+# 📄 Homepage route
+# ------------------------------------------------
 @app.route("/")
 def home():
     html = """
-    <!DOCTYPE html>
     <html>
     <head>
-        <title>YouTube Live Audio Streams</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>🎧 YouTube Live Audio Streams</title>
         <style>
-            body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin:0; }
-            h1 { color:#0ff; margin-top:20px; }
-            .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; padding:20px; }
-            a { display:block; padding:10px; background:#222; border-radius:10px; color:#0ff; text-decoration:none; transition:0.2s; }
-            a:hover { background:#0ff; color:#111; }
-            footer { margin:20px; font-size:14px; color:#777; }
+            body { font-family: Arial; background: #111; color: #fff; text-align: center; }
+            h1 { color: #00ff99; margin-top: 20px; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 20px; }
+            a { display: block; background: #222; color: #00ffcc; text-decoration: none; padding: 10px; border-radius: 10px; border: 1px solid #333; transition: 0.3s; }
+            a:hover { background: #00ffcc; color: #000; font-weight: bold; }
         </style>
     </head>
     <body>
-        <h1>📡 YouTube Live Audio Streams</h1>
+        <h1>🎧 YouTube Live Audio Streams</h1>
         <div class="grid">
             {% for name in streams %}
                 <a href="/{{ name }}" target="_blank">{{ name.replace('_', ' ').title() }}</a>
             {% endfor %}
         </div>
-        <footer>Powered by Flask + FFmpeg + yt-dlp</footer>
+        <p style="color:#888;">Click a station to start streaming audio.</p>
     </body>
     </html>
     """
     return render_template_string(html, streams=YOUTUBE_STREAMS.keys())
 
 
+# ------------------------------------------------
+# 🎙️ Stream endpoint
+# ------------------------------------------------
 @app.route("/<station_name>")
 def stream(station_name):
-    """Serve station stream."""
+    """Serve the requested station as a live stream."""
     url = CACHE.get(station_name)
+
     if not url:
-        logging.warning(f"URL missing for {station_name}, retrying...")
-        yt_url = YOUTUBE_STREAMS.get(station_name)
-        if yt_url:
-            url = get_youtube_audio_url(yt_url)
-            if url:
-                CACHE[station_name] = url
-            else:
-                return "Stream temporarily unavailable. Try again later.", 503
-        else:
-            return "Station not found", 404
+        return "Station not found or not available", 404
+
     return Response(generate_stream(url), mimetype="audio/mpeg")
 
 
+# ------------------------------------------------
+# Run app
+# ------------------------------------------------
 if __name__ == "__main__":
-    init_cache()  # 👈 Ensure CACHE is populated before start
-    threading.Thread(target=refresh_stream_urls, daemon=True).start()
     app.run(host="0.0.0.0", port=8000, debug=False)
