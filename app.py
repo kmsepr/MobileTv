@@ -3,7 +3,7 @@ import threading
 import os
 import logging
 import subprocess
-from flask import Flask, Response, abort
+from flask import Flask, Response, render_template_string, abort
 
 # ----------------------------------
 # CONFIGURE LOGGING & APP
@@ -129,6 +129,39 @@ def generate_stream(url, is_audio=False):
 # ----------------------------------
 # ROUTES
 # ----------------------------------
+
+@app.route("/")
+def home():
+    html = """
+    <!doctype html>
+    <html>
+    <head>
+        <title>📻 Live TV & YouTube Audio</title>
+        <style>
+            body { font-family: sans-serif; background: #111; color: #eee; text-align: center; }
+            h1 { color: #6cf; }
+            a { color: #0f0; text-decoration: none; display: block; margin: 8px; }
+            .section { background: #222; border-radius: 12px; padding: 10px; margin: 15px; }
+        </style>
+    </head>
+    <body>
+        <h1>📡 Live Streams</h1>
+        <div class="section">
+            <h2>🎬 TV Channels</h2>
+            {% for name in tv %}
+                <a href="/tv/{{name}}" target="_blank">{{name}}</a>
+            {% endfor %}
+        </div>
+        <div class="section">
+            <h2>🎧 YouTube Audio (Radio)</h2>
+            {% for name in yt %}
+                <a href="/yt/{{name}}" target="_blank">{{name}}</a>
+            {% endfor %}
+        </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html, tv=TV_STREAMS.keys(), yt=YOUTUBE_STREAMS.keys())
 
 @app.route("/tv/<name>")
 def tv_stream(name):
