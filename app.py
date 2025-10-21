@@ -3,8 +3,8 @@ import time
 import threading
 import os
 import logging
-from flask import Flask, Response, render_template_string
 from collections import deque
+from flask import Flask, Response, request, make_response, render_template_string
 
 # -----------------------
 # Configure logging
@@ -50,14 +50,11 @@ def get_youtube_audio_url(youtube_url: str):
     """Get direct audio URL from YouTube live."""
     try:
         command = ["yt-dlp", "-f", "91", "-g", youtube_url]
-
-        # Insert cookies if file exists
         if os.path.exists(COOKIES_FILE):
             command.insert(1, "--cookies")
             command.insert(2, COOKIES_FILE)
 
         result = subprocess.run(command, capture_output=True, text=True)
-
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
         else:
@@ -99,7 +96,6 @@ def generate_stream(station_name: str):
         return
 
     buffer = deque(maxlen=2000)  # ~2 min buffer
-
     while True:
         process = subprocess.Popen(
             [
@@ -145,14 +141,19 @@ def generate_stream(station_name: str):
         time.sleep(5)
 
 # -----------------------
-# Stream route
+# Stream route (forces download)
 # -----------------------
 @app.route("/<station_name>")
 def stream(station_name):
     url = CACHE.get(station_name)
     if not url:
         return "Station not found or not available", 404
-    return Response(generate_stream(station_name), mimetype="audio/mpeg")
+
+    response = Response(generate_stream(station_name), mimetype="audio/mpeg")
+    response.headers["Content-Disposition"] = f'attachment; filename="{station_name}.mp3"'
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 # -----------------------
 # Homepage
@@ -183,7 +184,7 @@ def index():
     keypad_map = {}
     for idx, name in enumerate(sorted_live, 1):
         display_name = name.replace("_", " ").title()
-        html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
+        html += f"<a href='/{name}' download>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
         key = str(idx % 10)
         keypad_map[key] = name
 
