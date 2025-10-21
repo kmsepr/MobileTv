@@ -242,7 +242,59 @@ document.addEventListener("keydown", function(e) {{
     return html
 
 # -----------------------
-# Listen (Audio Only - 40kbps mono MP3)
+# Resilient FFmpeg generator (prevents 40s cut)
+# -----------------------
+def generate_stream(url):
+    """
+    Streams audio using FFmpeg with reconnect options and restarts when FFmpeg exits.
+    This prevents the typical ~40s stop+buffer behavior with YouTube/HLS.
+    """
+    while True:
+        try:
+            logging.info(f"🎵 Starting FFmpeg for: {url}")
+            process = subprocess.Popen(
+                [
+                    "ffmpeg",
+                    "-hide_banner", "-loglevel", "error",
+                    # reconnect options (critical for YouTube/HLS segments)
+                    "-reconnect", "1",
+                    "-reconnect_streamed", "1",
+                    "-reconnect_delay_max", "10",
+                    # input-related options
+                    "-timeout", "5000000",
+                    "-user_agent", "Mozilla/5.0",
+                    "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
+                    "-fflags", "+genpts",
+                    "-i", url,
+                    # output/transcode to lightweight mono MP3
+                    "-vn", "-ac", "1", "-ar", "44100",
+                    "-b:a", "40k",
+                    "-bufsize", "1M",
+                    "-f", "mp3",
+                    "pipe:1"
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                bufsize=4096
+            )
+
+            # stream stdout until process ends
+            for chunk in iter(lambda: process.stdout.read(4096), b""):
+                if not chunk:
+                    break
+                yield chunk
+
+            # wait for process to finish and then restart
+            process.wait()
+            logging.warning("⚠️ FFmpeg process ended, restarting in 2s...")
+        except Exception as e:
+            logging.error(f"❌ generate_stream error: {e}")
+
+        # brief delay before restarting FFmpeg
+        time.sleep(2)
+
+# -----------------------
+# Listen (Audio Only - 40kbps mono MP3) using generate_stream()
 # -----------------------
 @app.route("/listen/<channel>")
 def listen(channel):
@@ -250,21 +302,7 @@ def listen(channel):
     if not url:
         return "Stream not ready", 503
 
-    ffmpeg_cmd = [
-        "ffmpeg", "-i", url,
-        "-vn", "-ac", "1", "-ar", "44100", "-b:a", "40k",
-        "-f", "mp3", "-hide_banner", "-loglevel", "error", "pipe:1"
-    ]
-
-    def generate():
-        process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
-        try:
-            for chunk in iter(lambda: process.stdout.read(4096), b""):
-                yield chunk
-        finally:
-            process.kill()
-
-    return Response(stream_with_context(generate()), mimetype="audio/mpeg")
+    return Response(stream_with_context(generate_stream(url)), mimetype="audio/mpeg")
 
 # -----------------------
 # Proxy Stream
