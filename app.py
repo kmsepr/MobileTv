@@ -150,9 +150,11 @@ def stream(station_name):
         return "Station not found or not available", 404
 
     response = Response(generate_stream(station_name), mimetype="audio/mpeg")
-    response.headers["Content-Disposition"] = f'attachment; filename="{station_name}.mp3"'
-    response.headers["Cache-Control"] = "no-store"
+    # Do NOT use Content-Disposition: attachment
+    response.headers["Cache-Control"] = "no-cache"
     response.headers["Pragma"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+    response.headers["Transfer-Encoding"] = "chunked"
     return response
 
 # -----------------------
