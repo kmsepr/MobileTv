@@ -1,7 +1,7 @@
 import time
 import threading
 import logging
-from flask import Flask, Response, render_template_string, abort
+from flask import Flask, Response, render_template_string, abort, stream_with_context
 import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -242,60 +242,29 @@ document.addEventListener("keydown", function(e) {{
     return html
 
 # -----------------------
-# Listen (Audio Only)
+# Listen (Audio Only - 40kbps mono MP3)
 # -----------------------
 @app.route("/listen/<channel>")
 def listen(channel):
-    tv_channels = list(TV_STREAMS.keys())
-    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
-    all_channels = tv_channels + live_youtube
-    if channel not in all_channels:
-        abort(404)
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Stream not ready", 503
 
-    audio_url = TV_STREAMS.get(channel, f"/stream/{channel}")
-    current_index = all_channels.index(channel)
-    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
-    next_channel = all_channels[(current_index + 1) % len(all_channels)]
+    ffmpeg_cmd = [
+        "ffmpeg", "-i", url,
+        "-vn", "-ac", "1", "-ar", "44100", "-b:a", "40k",
+        "-f", "mp3", "-hide_banner", "-loglevel", "error", "pipe:1"
+    ]
 
-    html = f"""
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{channel.replace('_',' ').title()} - Audio</title>
-<style>
-body {{ background:#000; color:#0f0; text-align:center; margin:0; padding:20px; font-family:sans-serif; }}
-audio {{ width:90%; margin-top:30px; }}
-a {{ color:#0ff; text-decoration:none; margin:10px; display:inline-block; font-size:18px; }}
-</style>
-<script>
-document.addEventListener("DOMContentLoaded", function() {{
-  const audio = document.getElementById("player");
-  audio.src = "{audio_url}";
-  audio.play().catch(()=>{{console.log('Autoplay blocked');}});
-}});
-document.addEventListener("keydown", function(e) {{
-  const a=document.getElementById("player");
-  if(e.key==="4")window.location.href="/listen/{prev_channel}";
-  if(e.key==="6")window.location.href="/listen/{next_channel}";
-  if(e.key==="0")window.location.href="/";
-  if(e.key==="5"&&a){{a.paused?a.play():a.pause();}}
-  if(e.key==="9")window.location.reload();
-}});
-</script>
-</head>
-<body>
-<h2>🎧 {channel.replace('_',' ').title()}</h2>
-<audio id="player" controls autoplay></audio>
-<div style="margin-top:15px;">
-  <a href="/">⬅ Home</a>
-  <a href="/listen/{prev_channel}">⏮ Prev</a>
-  <a href="/listen/{next_channel}">⏭ Next</a>
-  <a href="/listen/{channel}" style="color:#0ff;">🔄 Reload</a>
-  <a href="/watch/{channel}" style="color:#f0f;">🎥 Video</a>
-</div>
-</body>
-</html>"""
-    return html
+    def generate():
+        process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE)
+        try:
+            for chunk in iter(lambda: process.stdout.read(4096), b""):
+                yield chunk
+        finally:
+            process.kill()
+
+    return Response(stream_with_context(generate()), mimetype="audio/mpeg")
 
 # -----------------------
 # Proxy Stream
@@ -305,16 +274,10 @@ def stream(channel):
     url = CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
-
     headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        return f"Error fetching stream: {e}", 502
-
-    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
-    return Response(r.content, content_type=content_type)
+    r = requests.get(url, headers=headers, timeout=10)
+    r.raise_for_status()
+    return Response(r.content, content_type=r.headers.get("Content-Type", "application/vnd.apple.mpegurl"))
 
 # -----------------------
 # Run Server
