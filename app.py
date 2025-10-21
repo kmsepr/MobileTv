@@ -3,18 +3,18 @@ import time
 import threading
 import os
 import logging
-from collections import deque
 from flask import Flask, Response, render_template_string
+from collections import deque
 
-# ------------------------------------------------
-# Logging & Flask setup
-# ------------------------------------------------
+# -----------------------
+# Configure logging
+# -----------------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
 
-# ------------------------------------------------
-# YouTube live stream list
-# ------------------------------------------------
+# -----------------------
+# YouTube Live Streams
+# -----------------------
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
@@ -37,126 +37,173 @@ YOUTUBE_STREAMS = {
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
 }
 
-# ------------------------------------------------
-# Cache and configuration
-# ------------------------------------------------
+# -----------------------
+# Cache for direct stream URLs
+# -----------------------
 CACHE = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
-# ------------------------------------------------
-# Extract direct audio URL
-# ------------------------------------------------
+# -----------------------
+# Extract YouTube audio URL
+# -----------------------
 def get_youtube_audio_url(youtube_url: str):
-    """Get direct YouTube live audio URL."""
+    """Get direct audio URL from YouTube live."""
     try:
         command = ["yt-dlp", "-f", "91", "-g", youtube_url]
+
+        # Insert cookies if file exists
         if os.path.exists(COOKIES_FILE):
             command.insert(1, "--cookies")
             command.insert(2, COOKIES_FILE)
+
         result = subprocess.run(command, capture_output=True, text=True)
+
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-        logging.error(f"yt-dlp error for {youtube_url}: {result.stderr.strip()}")
+        else:
+            logging.error(f"yt-dlp error for {youtube_url}: {result.stderr.strip()}")
+            return None
     except Exception:
-        logging.exception("Failed extracting stream URL")
-    return None
+        logging.exception("Exception while extracting YouTube audio")
+        return None
 
-# ------------------------------------------------
-# Background refresh (every 5 minutes)
-# ------------------------------------------------
+# -----------------------
+# Refresh stream URLs every 60s
+# -----------------------
 def refresh_stream_urls():
+    last_update = {}
     while True:
-        logging.info("🔄 Checking YouTube live URLs...")
-        for name, yurl in YOUTUBE_STREAMS.items():
-            direct = get_youtube_audio_url(yurl)
-            if direct:
-                CACHE[name] = direct
-                logging.info(f"✅ Cached {name}")
-            else:
-                logging.warning(f"⚠️ Could not refresh {name}")
-        time.sleep(300)  # 5 minutes
+        logging.info("🔄 Refreshing YouTube stream URLs...")
+        now = time.time()
+        for name, url in YOUTUBE_STREAMS.items():
+            if name not in last_update or now - last_update[name] > 60:
+                direct_url = get_youtube_audio_url(url)
+                if direct_url:
+                    CACHE[name] = direct_url
+                    last_update[name] = now
+                    logging.info(f"✅ Updated {name}")
+                else:
+                    logging.warning(f"❌ Failed to update {name}")
+        time.sleep(60)
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
-# ------------------------------------------------
-# Continuous FFmpeg stream generator
-# ------------------------------------------------
-def generate_stream(station):
-    """Continuously yield MP3 audio chunks with FFmpeg reconnect logic."""
+# -----------------------
+# Stream generator
+# -----------------------
+def generate_stream(station_name: str):
+    """Yield MP3 chunks using FFmpeg with reconnect."""
+    url = CACHE.get(station_name)
+    if not url:
+        logging.warning(f"No cached URL for {station_name}")
+        return
+
+    buffer = deque(maxlen=2000)  # ~2 min buffer
+
     while True:
-        url = CACHE.get(station)
-        if not url:
-            logging.warning(f"❌ No URL cached for {station}, waiting...")
-            time.sleep(10)
-            continue
+        process = subprocess.Popen(
+            [
+                "ffmpeg",
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "10",
+                "-timeout", "5000000",
+                "-user_agent", "Mozilla/5.0",
+                "-i", url,
+                "-vn",
+                "-ac", "1",
+                "-b:a", "40k",
+                "-bufsize", "1M",
+                "-f", "mp3",
+                "-"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=4096,
+        )
 
-        cmd = [
-            "ffmpeg",
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_at_eof", "1",
-            "-rw_timeout", "5000000",
-            "-user_agent", "Mozilla/5.0",
-            "-i", url,
-            "-vn",
-            "-ac", "1",
-            "-b:a", "48k",
-            "-bufsize", "512k",
-            "-f", "mp3",
-            "-"
-        ]
-
-        logging.info(f"▶️ Starting FFmpeg for {station}")
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=4096)
-        buffer = deque(maxlen=4000)
+        logging.info(f"🎵 Streaming {station_name}")
 
         try:
             for chunk in iter(lambda: process.stdout.read(4096), b""):
-                if chunk:
-                    buffer.append(chunk)
+                buffer.append(chunk)
+                if buffer:
                     yield buffer.popleft()
                 else:
                     time.sleep(0.05)
         except GeneratorExit:
+            logging.info(f"❌ Client disconnected from {station_name}")
             process.terminate()
+            process.wait()
             break
         except Exception as e:
-            logging.error(f"Stream error for {station}: {e}")
+            logging.error(f"Stream error: {e}")
 
-        logging.warning(f"⚠️ Restarting FFmpeg for {station}")
+        logging.warning(f"⚠️ FFmpeg stopped for {station_name}, restarting...")
         process.terminate()
         process.wait()
-        time.sleep(3)
+        time.sleep(5)
 
-# ------------------------------------------------
-# Flask Routes
-# ------------------------------------------------
-@app.route("/<station>")
-def stream(station):
-    if station not in YOUTUBE_STREAMS:
-        return "Invalid station name", 404
-    return Response(generate_stream(station), mimetype="audio/mpeg",
-                    headers={"Cache-Control": "no-cache",
-                             "Connection": "keep-alive",
-                             "Transfer-Encoding": "chunked"})
+# -----------------------
+# Stream route
+# -----------------------
+@app.route("/<station_name>")
+def stream(station_name):
+    url = CACHE.get(station_name)
+    if not url:
+        return "Station not found or not available", 404
+    return Response(generate_stream(station_name), mimetype="audio/mpeg")
 
+# -----------------------
+# Homepage
+# -----------------------
 @app.route("/")
 def index():
-    live = sorted(YOUTUBE_STREAMS.keys())
+    live_channels = {k: v for k, v in YOUTUBE_STREAMS.items() if k in CACHE and CACHE[k]}
+    sorted_live = sorted(live_channels.keys())
+
     html = """
-    <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Live Radio</title></head>
-    <body style="font-family:sans-serif;padding:10px">
-    <h3>🎧 Continuous YouTube Live Audio Streams</h3>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>YouTube Live Audio Streams</title>
+      <style>
+        body { font-family: sans-serif; padding: 10px; background: #fff; }
+        a { display: block; margin: 5px 0; font-weight: bold; color: blue; text-decoration: underline; cursor: pointer; }
+        a:hover { color: red; }
+        .live { color: red; font-weight: bold; margin-left: 5px; }
+      </style>
+    </head>
+    <body>
+      <h3>🎵 Currently Live Streams</h3>
     """
-    for i, name in enumerate(live, 1):
-        disp = name.replace("_", " ").title()
-        html += f"<a href='/{name}' style='display:block;margin:6px 0'>{i}. {disp} 🔴</a>"
-    html += "</body></html>"
+
+    keypad_map = {}
+    for idx, name in enumerate(sorted_live, 1):
+        display_name = name.replace("_", " ").title()
+        html += f"<a href='/{name}'>{idx}. {display_name} <span class='live'>LIVE</span></a>\n"
+        key = str(idx % 10)
+        keypad_map[key] = name
+
+    html += f"""
+    <script>
+    const streamMap = {keypad_map};
+    document.addEventListener("keydown", function(e) {{
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        const key = e.key;
+        if (key in streamMap) {{
+            window.location.href = '/' + streamMap[key];
+        }}
+    }});
+    </script>
+    </body></html>
+    """
     return render_template_string(html)
 
-# ------------------------------------------------
-# Run Server
-# ------------------------------------------------
+# -----------------------
+# Run Flask
+# -----------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, threaded=True)
+    app.run(host="0.0.0.0", port=8000, debug=False)
