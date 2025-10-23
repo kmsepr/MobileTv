@@ -25,7 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 COOKIES_FILE = "/mnt/data/cookies.txt"
-COOKIES_PATH = "/mnt/data/playlist.txt"
+COOKIES_PATH = "/mnt/data/cookies.txt"
 CACHE_FILE = "/mnt/data/cache.json"
 PLAYLISTS_FILE = "/mnt/data/playlists.json"
 MAX_QUEUE_SIZE = 100
