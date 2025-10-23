@@ -482,15 +482,34 @@ def audio_only(channel):
 # MAIN
 # -----------------------------
 if __name__=="__main__":
-    # Start playlist workers
+    # Ensure default playlists exist
+    DEFAULT_PLAYLISTS = {
+        "Malayalam": "https://youtube.com/playlist?list=PLs0evDzPiKwAyJDAbmMOg44iuNLPaI4nn",
+        "Hindi": "https://youtube.com/playlist?list=PLlXSv-ic4-yJj2djMawc8XqqtCn1BVAc2",
+        "Kashmir": "https://www.youtube.com/playlist?list=PLXXXXX"  # <-- replace with actual
+    }
+
+    for name, url in DEFAULT_PLAYLISTS.items():
+        if name not in PLAYLISTS:
+            PLAYLISTS[name] = url
+            SHUFFLE_PLAYLISTS.add(name)
+    save_playlists()
+
+    # Start playlist workers for all playlists
     for name in PLAYLISTS:
-        STREAMS[name] = {
-            "VIDEO_IDS": load_playlist_ids(name),
-            "INDEX": 0,
-            "QUEUE": deque(),
-            "LOCK": threading.Lock(),
-            "LAST_REFRESH": time.time(),
-        }
-        threading.Thread(target=stream_worker,args=(name,),daemon=True).start()
+        if name not in STREAMS:
+            STREAMS[name] = {
+                "VIDEO_IDS": load_playlist_ids(name),
+                "INDEX": 0,
+                "QUEUE": deque(),
+                "LOCK": threading.Lock(),
+                "LAST_REFRESH": time.time(),
+                "CURRENT_AUDIO_URL": None,
+                "SKIP_CURRENT": False
+            }
+        t = threading.Thread(target=stream_worker,args=(name,),daemon=True)
+        t.start()
+        logging.info(f"[{name}] Worker thread started")
+
     logging.info("🎧 Unified TV + YouTube Radio started")
     app.run(host="0.0.0.0", port=5000)
