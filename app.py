@@ -105,19 +105,87 @@ HOME_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📺 TV & YouTube Radio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>📺 Unified TV & Radio</title>
 <style>
-body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:0; text-align:center; }
-h2 { margin:10px; }
-.tabs { display:flex; justify-content:center; margin:10px 0; }
-.tab { padding:10px 20px; cursor:pointer; background:#222; margin:0 5px; border-radius:10px; color:#0ff; transition:0.2s; }
-.tab.active { background:#0ff; color:#000; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:12px; padding:10px; }
-.card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
-.card:hover { background:#333; }
-.card a { color:#0ff; text-decoration:none; font-size:14px; }
-.hidden { display:none; }
+body {
+    font-family: sans-serif;
+    background: #000;
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+h2 {
+    margin: 10px;
+    color: #0ff;
+    font-size: 1.5em;
+}
+.tabs {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 10px 0;
+}
+.tab {
+    padding: 12px 20px;
+    cursor: pointer;
+    background: #111;
+    margin: 4px;
+    border-radius: 12px;
+    color: #0ff;
+    font-size: 1.1em;
+    transition: 0.2s;
+}
+.tab.active, .tab:focus {
+    background: #0ff;
+    color: #000;
+    outline: none;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    padding: 10px;
+}
+.card {
+    background: #111;
+    border-radius: 15px;
+    padding: 20px 10px;
+    font-size: 1em;
+    transition: 0.3s;
+}
+.card:hover, .card:focus-within {
+    background: #222;
+}
+.card a {
+    display: block;
+    margin: 6px 0;
+    padding: 8px 0;
+    background: #0ff;
+    color: #000;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1em;
+}
+.card a:focus {
+    outline: 2px solid #fff;
+    background: #fff;
+    color: #000;
+}
+a#addbtn {
+    display: block;
+    background: #0f0;
+    color: #000;
+    margin: 20px auto;
+    padding: 10px;
+    border-radius: 10px;
+    width: 200px;
+    font-weight: bold;
+    text-decoration: none;
+}
+.hidden { display: none; }
 </style>
 <script>
 function showTab(tab){
@@ -130,18 +198,18 @@ window.onload=()=>showTab('tv');
 </script>
 </head>
 <body>
-<h2>📺 TV & YouTube Radio</h2>
+<h2>📺 Unified TV & YouTube Radio</h2>
 <div class="tabs">
-    <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV</div>
-    <div class="tab" id="tab_live" onclick="showTab('live')">▶ YouTube Live</div>
-    <div class="tab" id="tab_playlists" onclick="showTab('playlists')">🎵 Playlists</div>
+    <div class="tab" id="tab_tv" tabindex="0" onclick="showTab('tv')">📺 TV</div>
+    <div class="tab" id="tab_live" tabindex="0" onclick="showTab('live')">▶ YouTube Live</div>
+    <div class="tab" id="tab_playlists" tabindex="0" onclick="showTab('playlists')">🎵 Playlists</div>
 </div>
 
 <div id="tv" class="grid">
 {% for key in tv_channels %}
-<div class="card">
+<div class="card" tabindex="0">
   <b>{{key.replace('_',' ').title()}}</b><br>
-  <a href="/watch/{{key}}">▶ Watch</a><br>
+  <a href="/watch/{{key}}">▶ Watch</a>
   <a href="/audio/{{key}}">🎵 Audio</a>
 </div>
 {% endfor %}
@@ -149,9 +217,9 @@ window.onload=()=>showTab('tv');
 
 <div id="live" class="grid hidden">
 {% for key in live_channels %}
-<div class="card">
+<div class="card" tabindex="0">
   <b>{{key.replace('_',' ').title()}}</b><br>
-  <a href="/watch/{{key}}">▶ Watch</a><br>
+  <a href="/watch/{{key}}">▶ Watch</a>
   <a href="/audio/{{key}}">🎵 Audio</a>
 </div>
 {% endfor %}
@@ -159,15 +227,15 @@ window.onload=()=>showTab('tv');
 
 <div id="playlists" class="grid hidden">
 {% for name in playlists %}
-<div class="card">
+<div class="card" tabindex="0">
   <b>{{name}}</b><br>
-  <a href="/listen/{{name}}">▶ Listen</a><br>
-  <a href="/delete/{{name}}" style="color:#f00;">🗑️ Delete</a>
+  <a href="/listen/{{name}}">▶ Listen</a>
+  <a href="/delete/{{name}}" style="background:#f33;color:#fff;">🗑 Delete</a>
 </div>
 {% endfor %}
-<a href="/add_playlist_form">➕ Add Playlist</a>
 </div>
 
+<a id="addbtn" href="/add_playlist_form">➕ Add Playlist</a>
 </body>
 </html>
 """
@@ -178,10 +246,37 @@ PLAYER_HTML = """
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{name}} Radio</title>
+<style>
+body {
+  background: #000;
+  color: #0f0;
+  text-align: center;
+  font-family: sans-serif;
+  font-size: 1.1em;
+}
+a {
+  color: #0ff;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 10px;
+  padding: 10px 20px;
+  background: #111;
+  border-radius: 10px;
+}
+a:focus {
+  outline: 2px solid #fff;
+}
+audio {
+  width: 95%;
+  max-width: 500px;
+  margin: 20px auto;
+  display: block;
+}
+</style>
 </head>
-<body style="background:#000;color:#0f0;text-align:center;font-family:sans-serif;">
+<body>
 <h3>🎶 {{name}} Radio</h3>
-<audio controls autoplay style="width:90%;margin:20px auto;display:block;">
+<audio controls autoplay>
   <source src="/stream/{{name}}" type="audio/mpeg">
   Your browser does not support audio playback.
 </audio>
