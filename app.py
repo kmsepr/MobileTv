@@ -152,10 +152,10 @@ window.onload=()=>showTab('tv');
 <div id="tv" class="grid">
 {% for key in tv_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}">
     <img src="{{ logos.get(key) }}">
-    <span>{{ key.replace('_',' ').title() }}</span>
-  </a>
+    <span>{{ key.replace('_',' ').title() }}</span><br>
+    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
+    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
 </div>
@@ -163,10 +163,10 @@ window.onload=()=>showTab('tv');
 <div id="youtube" class="grid hidden">
 {% for key in youtube_channels %}
 <div class="card">
-  <a href="/watch/{{ key }}">
     <img src="{{ logos.get(key) }}">
-    <span>{{ key.replace('_',' ').title() }}</span>
-  </a>
+    <span>{{ key.replace('_',' ').title() }}</span><br>
+    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
+    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
 </div>
