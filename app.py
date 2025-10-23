@@ -246,58 +246,111 @@ def load_playlist_ids(name, force=False):
 # -----------------------------
 # Playlist worker
 # -----------------------------
+# -----------------------------
+# STREAM WORKER (direct audio URL)
+# -----------------------------
 def stream_worker(name):
     stream = STREAMS[name]
+    failed_videos = set()
     shuffle_enabled = name in SHUFFLE_PLAYLISTS
-    played = set()
+
     while True:
         try:
+            # Reload playlist if empty
             if not stream["VIDEO_IDS"]:
+                logging.info(f"[{name}] Playlist empty, reloading...")
                 stream["VIDEO_IDS"] = load_playlist_ids(name, force=True)
-                played.clear()
+                failed_videos.clear()
                 stream["INDEX"] = 0
                 if not stream["VIDEO_IDS"]:
                     time.sleep(10)
                     continue
-            if time.time()-stream["LAST_REFRESH"]>1800:
+
+            # Auto-refresh every 30min
+            if time.time() - stream["LAST_REFRESH"] > 1800:
+                logging.info(f"[{name}] Auto-refreshing playlist IDs...")
                 stream["VIDEO_IDS"] = load_playlist_ids(name, force=True)
-                played.clear()
-                stream["INDEX"]=0
-                stream["LAST_REFRESH"]=time.time()
-                if shuffle_enabled: random.shuffle(stream["VIDEO_IDS"])
+                failed_videos.clear()
+                stream["INDEX"] = 0
+                stream["LAST_REFRESH"] = time.time()
+                if shuffle_enabled:
+                    random.shuffle(stream["VIDEO_IDS"])
 
             # Pick next video
             if shuffle_enabled:
-                available = [v for v in stream["VIDEO_IDS"] if v not in played]
+                available = [v for v in stream["VIDEO_IDS"] if v not in failed_videos]
                 if not available:
-                    played.clear()
+                    failed_videos.clear()
                     available = stream["VIDEO_IDS"]
                 vid = random.choice(available)
-                played.add(vid)
             else:
                 vid = stream["VIDEO_IDS"][stream["INDEX"] % len(stream["VIDEO_IDS"])]
                 stream["INDEX"] += 1
 
             url = f"https://www.youtube.com/watch?v={vid}"
+            logging.info(f"[{name}] ▶️ Preparing: {url}")
 
-            result = subprocess.run(
-                ["yt-dlp","-f","bestaudio[ext=m4a]/bestaudio","--cookies",COOKIES_FILE,"-g",url],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
-            )
-            audio_url = result.stdout.strip()
-            cmd = f'ffmpeg -re -i "{audio_url}" -b:a 40k -ac 1 -f mp3 pipe:1 -loglevel quiet'
-            proc = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            # Skip if cookies missing
+            if not os.path.exists(COOKIES_PATH) or os.path.getsize(COOKIES_PATH) == 0:
+                logging.warning(f"[{name}] Cookies missing, skipping video {vid}")
+                failed_videos.add(vid)
+                continue
+
+            # Get direct audio URL
+            try:
+                result = subprocess.run(
+                    ["yt-dlp", "-f", "bestaudio[ext=m4a]/bestaudio", "--cookies", COOKIES_PATH, "-g", url],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True
+                )
+                audio_url = result.stdout.strip()
+                stream["CURRENT_AUDIO_URL"] = audio_url
+            except subprocess.CalledProcessError:
+                logging.warning(f"[{name}] Failed to get audio URL for {vid}")
+                failed_videos.add(vid)
+                continue
+
+            # Wait before switching to next video
+            while True:
+                # Wait until CURRENT_AUDIO_URL changes
+                if stream.get("SKIP_CURRENT"):
+                    stream["SKIP_CURRENT"] = False
+                    break
+                time.sleep(1)
+
+        except Exception as e:
+            logging.error(f"[{name}] Worker error: {e}", exc_info=True)
+            time.sleep(5)
+
+# -----------------------------
+# STREAM ROUTE (direct FFmpeg)
+# -----------------------------
+@app.route("/stream/<name>")
+def stream_audio(name):
+    if name not in STREAMS:
+        abort(404)
+    stream = STREAMS[name]
+
+    if "CURRENT_AUDIO_URL" not in stream or not stream["CURRENT_AUDIO_URL"]:
+        return "Stream not ready yet", 503
+
+    cmd = f'ffmpeg -re -i "{stream["CURRENT_AUDIO_URL"]}" -b:a 40k -ac 1 -f mp3 pipe:1 -loglevel quiet'
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def generate():
+        try:
             while True:
                 chunk = proc.stdout.read(4096)
                 if not chunk:
                     break
-                if len(stream["QUEUE"])<MAX_QUEUE_SIZE:
-                    stream["QUEUE"].append(chunk)
-            proc.stdout.close()
-            proc.stderr.close()
-            proc.wait()
-        except:
-            time.sleep(5)
+                yield chunk
+        finally:
+            proc.kill()
+
+    headers = {
+        "Content-Type": "audio/mpeg",
+        "Content-Disposition": f'attachment; filename="{name}.mp3"'
+    }
+    return Response(stream_with_context(generate()), headers=headers)
 
 # -----------------------------
 # Flask Routes
@@ -314,22 +367,7 @@ def listen(name):
         abort(404)
     return render_template_string(PLAYER_HTML, name=name, playlist_url=PLAYLISTS[name])
 
-@app.route("/stream/<name>")
-def stream_audio(name):
-    if name not in STREAMS:
-        abort(404)
-    stream = STREAMS[name]
-    def generate():
-        while True:
-            if stream["QUEUE"]:
-                yield stream["QUEUE"].popleft()
-            else:
-                time.sleep(0.1)
-    headers = {
-        "Content-Type": "audio/mpeg",
-        "Content-Disposition": f'attachment; filename="{name}.mp3"'
-    }
-    return Response(stream_with_context(generate()), headers=headers)
+
 
 @app.route("/add_playlist_form")
 def add_playlist_form():
