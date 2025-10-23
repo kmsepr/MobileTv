@@ -260,10 +260,11 @@ def stream(channel):
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
-    # Check TV streams first, then YouTube
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
+
+    filename = f"{channel}.mp3"
 
     def generate():
         cmd = [
@@ -271,7 +272,7 @@ def audio_only(channel):
             "-vn",               # no video
             "-ac", "1",          # mono
             "-b:a", "40k",       # 40kbps
-            "-f", "mp3",         # output format
+            "-f", "mp3",
             "pipe:1"
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -284,7 +285,11 @@ def audio_only(channel):
         finally:
             proc.terminate()
 
-    return Response(generate(), mimetype="audio/mpeg")
+    return Response(
+        generate(),
+        mimetype="audio/mpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 # -----------------------
 # Run Server
