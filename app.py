@@ -258,6 +258,34 @@ def stream(channel):
     content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
     return Response(r.content, content_type=content_type)
 
+@app.route("/audio/<channel>")
+def audio_only(channel):
+    # Check TV streams first, then YouTube
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
+
+    def generate():
+        cmd = [
+            "ffmpeg", "-i", url,
+            "-vn",               # no video
+            "-ac", "1",          # mono
+            "-b:a", "40k",       # 40kbps
+            "-f", "mp3",         # output format
+            "pipe:1"
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
+
+    return Response(generate(), mimetype="audio/mpeg")
+
 # -----------------------
 # Run Server
 # -----------------------
