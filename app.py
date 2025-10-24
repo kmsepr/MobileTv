@@ -120,65 +120,197 @@ def home():
     live_youtube = [n for n, live in LIVE_STATUS.items() if live]
 
     html = """
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>📺 TV & YouTube Live</title>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📺 Live TV & YouTube Channels</title>
 <style>
-body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:0; }
-h2 { text-align:center; margin:10px 0; }
-.tabs { display:flex; justify-content:center; background:#000; padding:10px; }
-.tab { padding:10px 20px; cursor:pointer; background:#222; color:#0ff; border-radius:10px; margin:0 5px; transition:0.2s; }
-.tab.active { background:#0ff; color:#000; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; padding:10px; }
-.card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
-.card:hover { background:#333; }
-.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
-.card span { font-size:14px; color:#0f0; }
-.hidden { display:none; }
-</style>
-<script>
-function showTab(tab){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.grid').forEach(g=>g.classList.add('hidden'));
-  document.getElementById(tab).classList.remove('hidden');
-  document.getElementById('tab_'+tab).classList.add('active');
+body {
+  font-family: system-ui, sans-serif;
+  background: #0e0e0e;
+  color: #fff;
+  margin: 0;
+  padding: 0;
 }
-window.onload=()=>showTab('tv');
+h1 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin: 20px 0 10px;
+}
+.tabs {
+  display: flex;
+  justify-content: center;
+  background: #111;
+  padding: 10px;
+  border-bottom: 1px solid #222;
+}
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 10px;
+  background: #222;
+  color: #0ff;
+  margin: 0 6px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+.tab.active {
+  background: #0ff;
+  color: #000;
+  transform: scale(1.05);
+}
+.search-container {
+  text-align: center;
+  margin: 12px 0;
+}
+.search-container input {
+  width: 80%;
+  max-width: 400px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  background: #1b1b1b;
+  color: #0ff;
+  text-align: center;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 18px;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.card {
+  background: #1b1b1b;
+  border-radius: 18px;
+  text-align: center;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 8px rgba(0, 255, 255, 0.1);
+  position: relative;
+}
+.card:hover {
+  transform: scale(1.06);
+  box-shadow: 0 5px 15px rgba(0,255,255,0.4);
+}
+.card img {
+  width: 100%;
+  height: 100px;
+  object-fit: contain;
+  background: #111;
+  padding: 10px;
+  transition: transform 0.3s ease;
+  border-bottom: 1px solid #222;
+}
+.card:hover img {
+  transform: scale(1.1);
+}
+.card span {
+  display: block;
+  font-size: 0.95rem;
+  margin-top: 8px;
+  font-weight: 600;
+  color: #fff;
+}
+.links {
+  margin: 10px 0 14px;
+}
+.links a {
+  color: #0ff;
+  margin: 0 6px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.links a:hover {
+  color: #ff0;
+}
+.live-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff1744;
+  color: white;
+  font-size: 0.75rem;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.hidden { display: none; }
+</style>
+
+<script>
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.grid').forEach(g => g.classList.add('hidden'));
+  document.getElementById(tab).classList.remove('hidden');
+  document.getElementById('tab_' + tab).classList.add('active');
+  document.getElementById("search").value = "";
+  filterChannels(""); // reset search
+}
+
+function filterChannels(value) {
+  const term = value.toLowerCase();
+  document.querySelectorAll('.card').forEach(card => {
+    const name = card.getAttribute('data-name');
+    if (!term || name.includes(term)) card.style.display = '';
+    else card.style.display = 'none';
+  });
+}
+
+window.onload = () => showTab('tv');
 </script>
 </head>
+
 <body>
-<div class="tabs">
-  <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV</div>
-  <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube</div>
-</div>
+  <h1>📡 Live TV & YouTube Streams</h1>
 
-<div id="tv" class="grid">
-{% for key in tv_channels %}
-<div class="card">
-    <img src="{{ logos.get(key) }}">
-    <span>{{ key.replace('_',' ').title() }}</span><br>
-    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
-</div>
-{% endfor %}
-</div>
+  <div class="tabs">
+    <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV Channels</div>
+    <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube Live</div>
+  </div>
 
-<div id="youtube" class="grid hidden">
-{% for key in youtube_channels %}
-<div class="card">
-    <img src="{{ logos.get(key) }}">
-    <span>{{ key.replace('_',' ').title() }}</span><br>
-    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
-</div>
-{% endfor %}
-</div>
+  <div class="search-container">
+    <input type="text" id="search" onkeyup="filterChannels(this.value)" placeholder="🔍 Search channels...">
+  </div>
+
+  <div id="tv" class="grid">
+  {% for key in tv_channels %}
+    <div class="card" data-name="{{ key.replace('_',' ').lower() }}">
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+      <span>{{ key.replace('_',' ').title() }}</span>
+      <div class="links">
+        <a href="/watch/{{ key }}">▶ Watch</a>
+        <a href="/audio/{{ key }}">🎵 Audio</a>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+
+  <div id="youtube" class="grid hidden">
+  {% for key in youtube_channels %}
+    <div class="card" data-name="{{ key.replace('_',' ').lower() }}">
+      <div class="live-badge">LIVE 🔴</div>
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+      <span>{{ key.replace('_',' ').title() }}</span>
+      <div class="links">
+        <a href="/watch/{{ key }}">▶ Watch</a>
+        <a href="/audio/{{ key }}">🎵 Audio</a>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
 </body>
 </html>
 """
     return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
-
+    
 # -----------------------
 # Watch Route
 # -----------------------
