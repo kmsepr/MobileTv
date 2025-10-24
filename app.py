@@ -1,47 +1,41 @@
-import os
 import time
 import threading
 import logging
-import subprocess
-import requests
-import json
 from flask import Flask, Response, render_template_string, abort
+import subprocess, os, requests
 
-# -----------------------
-# CONFIG
-# -----------------------
-LOG_PATH = "/mnt/data/tv.log"
-CACHE_PATH = "/mnt/data/iptv_cache.json"
-os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 app = Flask(__name__)
 
 # -----------------------
-# IPTV Categories to Load
+# TV Streams (direct m3u8)
 # -----------------------
-IPTV_SOURCES = {
-    "🇮🇳 India": "https://iptv-org.github.io/iptv/countries/in.m3u",
-    "🗣️ Malayalam": "https://iptv-org.github.io/iptv/languages/mal.m3u",
-    "🕌 Religious": "https://iptv-org.github.io/iptv/categories/religious.m3u",
-    "📰 News": "https://iptv-org.github.io/iptv/categories/news.m3u",
-    "⚽ Sports": "https://iptv-org.github.io/iptv/categories/sports.m3u",
-    "🎬 Entertainment": "https://iptv-org.github.io/iptv/categories/entertainment.m3u",
-    "🎓 Education": "https://iptv-org.github.io/iptv/categories/education.m3u",
-    "🎵 Music": "https://iptv-org.github.io/iptv/categories/music.m3u",
-    "🎥 Movies": "https://iptv-org.github.io/iptv/categories/movies.m3u",
-    "🧒 Kids": "https://iptv-org.github.io/iptv/categories/kids.m3u",
-    # Countries special (API to get list)
-    "🌍 Countries": "https://iptv-org.github.io/api/countries.json"
+TV_STREAMS = {
+    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "dd_sports": "https://cdn-6.pishow.tv/live/13/master.m3u8",
+    "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
+    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
+    "bloomberg_tv": "https://bloomberg-bloomberg-3-br.samsung.wurl.tv/manifest/playlist.m3u8",
+    "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
+    "aqsa_tv": "http://167.172.161.13/hls/feedspare/6udfi7v8a3eof6nlps6e9ovfrs65c7l7.m3u8",
+    "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
+    "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
+    "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
+    "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
+
+"asianet_news": "asianetnews.vgcdn.net/ptnr-Embed/v1/manifest/611d79b11b77e2f571934fd80ca1413453772ac7/1c19363c-e4a0-4e4d-ba28-771d5615b88e/54358811-f59d-4150-b8bc-c2e8714b953c/0.m3u8",
+
+"asianet_movies": "https://live.dinesh29.com.np/stream/jiotvplus/asianetmovieshd/master.m3u8",
 }
 
-TV_STREAMS = {}         # category_name -> {channel_key: info}
-COUNTRY_STREAMS = {}    # country_code -> {country: name, channels: {...}}
+
+
+# -----------------------
+# YouTube Live Channels
+# -----------------------
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-
-"asianet_news": "https://www.youtube.com/@asianetnews/live",
-
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
@@ -60,584 +54,383 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
-    "kas_ranker": "https://www.youtube.com/@kasrankerofficial/live",
+    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
-CHANNEL_LOGOS = {k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
+# -----------------------
+# Channel Logos
+# -----------------------
+CHANNEL_LOGOS = {
+    "safari_tv": "https://i.imgur.com/dSOfYyh.png",
+    "victers_tv": "https://i.imgur.com/kj4OEsb.png",
+    "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
+    "france_24": "https://upload.wikimedia.org/wikipedia/commons/c/c1/France_24_logo_%282013%29.svg",
+    "aqsa_tv": "https://i.imgur.com/Z2rfrQ8.png",
+    "mazhavil_manorama": "https://i.imgur.com/fjgzW20.png",
+    "dd_malayalam": "https://i.imgur.com/ywm2dTl.png",
+    "dd_sports": "https://i.imgur.com/J2Ky5OO.png",
+    "mult": "https://i.imgur.com/xi351Fx.png",
+    "yemen_today": "https://i.imgur.com/8TzcJu5.png",
+    "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
+    "al_sahat": "https://i.imgur.com/UVndAta.png",
+    **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
+}
+
 CACHE = {}
 LIVE_STATUS = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# UTIL: parse .m3u text into channels dict
+# Extract YouTube HLS URL
 # -----------------------
-def parse_m3u_text(text, prefix_key=None):
-    channels = {}
-    name, link, logo = None, None, None
-    for line in text.splitlines():
-        line = line.strip()
-        if not line: 
-            continue
-        if line.startswith("#EXTINF"):
-            parts = line.split(",")
-            name = parts[-1].strip()
-            if 'tvg-logo=' in line:
-                try:
-                    logo = line.split('tvg-logo="')[1].split('"')[0]
-                except Exception:
-                    logo = None
-        elif line.startswith("http") or line.startswith("rtmp") or line.startswith("udp://") or line.startswith("mms://"):
-            link = line
-            if name:
-                base_key = name.lower().replace(" ", "_").replace("/", "_")
-                key = f"{prefix_key}_{base_key}" if prefix_key else base_key
-                channels[key] = {"name": name, "url": link, "logo": logo}
-                name, link, logo = None, None, None
-    return channels
-
-def load_iptv_channels(url, prefix_key=None):
-    channels = {}
-    try:
-        resp = requests.get(url, timeout=20)
-        if resp.status_code == 200 and resp.text:
-            channels = parse_m3u_text(resp.text, prefix_key=prefix_key)
-            logging.info(f"✅ Loaded {len(channels)} channels from {url}")
-        else:
-            logging.warning(f"⚠️ Empty/Bad response from {url} status={resp.status_code}")
-    except Exception as e:
-        logging.error(f"❌ IPTV load failed from {url}: {e}")
-    return channels
-
-# -----------------------
-# Refresh IPTV categories + countries
-# -----------------------
-def refresh_iptv():
-    global TV_STREAMS, COUNTRY_STREAMS
-    all_categories = {}
-    countries_map = {}
-    # load normal categories
-    for group, url in IPTV_SOURCES.items():
-        if group == "🌍 Countries":
-            continue
-        all_categories[group] = load_iptv_channels(url)
-    # load countries list and per-country m3u
-    try:
-        api_url = IPTV_SOURCES.get("🌍 Countries")
-        if api_url:
-            resp = requests.get(api_url, timeout=20)
-            if resp.status_code == 200:
-                countries = resp.json()
-                for c in countries:
-                    code = c.get("iso2") or c.get("code") or c.get("id")
-                    cname = c.get("name") or code
-                    if not code:
-                        continue
-                    m3u_url = f"https://iptv-org.github.io/iptv/countries/{code.lower()}.m3u"
-                    chs = load_iptv_channels(m3u_url, prefix_key=code.lower())
-                    if chs:
-                        countries_map[code.upper()] = {"country": cname, "channels": chs}
-            else:
-                logging.warning("⚠️ Could not fetch countries.json; status=%s", resp.status_code)
-    except Exception as e:
-        logging.error("❌ Error loading countries: %s", e)
-
-    TV_STREAMS = all_categories
-    COUNTRY_STREAMS = countries_map
-    # cache
-    try:
-        with open(CACHE_PATH, "w") as f:
-            json.dump({"tv": TV_STREAMS, "countries": COUNTRY_STREAMS}, f)
-    except Exception:
-        logging.exception("Failed writing cache")
-    logging.info("📡 IPTV cache updated (categories + countries)")
-
-# Load cache if exists
-if os.path.exists(CACHE_PATH):
-    try:
-        with open(CACHE_PATH, "r") as f:
-            raw = json.load(f)
-            TV_STREAMS = raw.get("tv", {})
-            COUNTRY_STREAMS = raw.get("countries", {})
-            logging.info("Loaded IPTV cache from disk")
-    except Exception:
-        logging.exception("Failed to load cache; refreshing")
-        refresh_iptv()
-else:
-    refresh_iptv()
-
-# Periodic refresh thread
-def periodic_refresh():
-    while True:
-        try:
-            refresh_iptv()
-        except Exception:
-            logging.exception("Periodic refresh failed")
-        time.sleep(12 * 3600)
-
-threading.Thread(target=periodic_refresh, daemon=True).start()
-
-# -----------------------
-# YouTube Live refresh (same as before)
-# -----------------------
-def get_youtube_live_url(youtube_url):
+def get_youtube_live_url(youtube_url: str):
     try:
         cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", youtube_url]
         if os.path.exists(COOKIES_FILE):
             cmd.insert(1, "--cookies")
             cmd.insert(2, COOKIES_FILE)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except Exception:
         pass
     return None
 
-def refresh_youtube():
+# -----------------------
+# Background refresh thread
+# -----------------------
+def refresh_stream_urls():
     while True:
+        logging.info("🔄 Refreshing YouTube live URLs...")
         for name, url in YOUTUBE_STREAMS.items():
-            live_url = get_youtube_live_url(url)
-            if live_url:
-                CACHE[name] = live_url
+            direct_url = get_youtube_live_url(url)
+            if direct_url:
+                CACHE[name] = direct_url
                 LIVE_STATUS[name] = True
             else:
                 LIVE_STATUS[name] = False
-        time.sleep(300)
+        time.sleep(60)
 
-threading.Thread(target=refresh_youtube, daemon=True).start()
+threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Home: main grid of categories (SVG icons) and inline expansion
+# Home Page (with visible tabs)
 # -----------------------
 @app.route("/")
 def home():
-    # mapping of categories to simple inline SVG icons (you can replace with more detailed svgs)
-    category_svgs = {
-        "⭐ Favourites": """<svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.3l6.16 3.24-1.64-7.03L21 9.24l-7.19-.62L12 2 10.19 8.62 3 9.24l4.48 4.27L5.84 20.54 12 17.3z" fill="currentColor"/></svg>""",
-        "▶ YouTube": """<svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 15l5.2-3L10 9v6z" fill="currentColor"/><path d="M21 7s-.2-1.4-.8-2c-.8-.8-1.7-.8-2.1-.9C15.4 4 12 4 12 4s-3.5 0-5.9.1c-.4 0-1.3 0-2.1.9C3.2 5.6 3 7 3 7S2.9 9.1 2.9 11.2v1.6C2.9 15 3 17 3 17s.2 1.4.8 2c.8.8 1.9.8 2.4.9 1.8.2 7.9.2 7.9.2s3.5 0 5.9-.1c.4 0 1.3 0 2.1-.9.6-.6.8-2 .8-2s.1-2.1.1-4.2v-1.6C21.1 9.1 21 7 21 7z" fill="currentColor"/></svg>""",
-        "🇮🇳 India": """<svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="currentColor"/></svg>""",
-        "🗣️ Malayalam": """<svg width="40" height="40" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>""",
-        "🕌 Religious": """<svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 2 L2 7v7c0 5 5 8 10 8s10-3 10-8V7l-10-5z" fill="currentColor"/></svg>""",
-        "📰 News": """<svg width="40" height="40" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="currentColor"/></svg>""",
-        "⚽ Sports": """<svg width="40" height="40" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>""",
-        "🎬 Entertainment": """<svg width="40" height="40" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="currentColor"/></svg>""",
-        "🎓 Education": """<svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 2 L2 7l10 5 10-5-10-5z" fill="currentColor"/></svg>""",
-        "🎵 Music": """<svg width="40" height="40" viewBox="0 0 24 24"><path d="M9 17V5l10-2v12" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>""",
-        "🎥 Movies": """<svg width="40" height="40" viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="12" rx="2" fill="currentColor"/></svg>""",
-        "🧒 Kids": """<svg width="40" height="40" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3" fill="currentColor"/><rect x="7" y="13" width="10" height="6" rx="3" fill="currentColor"/></svg>""",
-        "🌍 Countries": """<svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z" fill="currentColor"/></svg>"""
-    }
-
-    # build a list of top-level categories (put favourites and youtube first)
-    categories = ["⭐ Favourites", "▶ YouTube"] + [g for g in IPTV_SOURCES.keys() if g != "🌍 Countries"] + ["🌍 Countries"]
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [n for n, live in LIVE_STATUS.items() if live]
 
     html = """
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>📺 IPTV - Categories</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📺 Live TV & YouTube Channels</title>
 <style>
-:root{--bg:#0b0b0b;--panel:#121212;--accent:#0ff;--muted:#888;--gap:12px}
-body{background:var(--bg);color:#fff;font-family:system-ui;margin:0;padding:12px}
-.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-h1{margin:0;color:var(--accent);font-size:1.05rem}
-.search input{padding:8px 12px;width:220px;background:#161616;border-radius:8px;border:0;color:var(--accent)}
-.main-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px}
-.tile{background:var(--panel);border-radius:12px;padding:14px;text-align:center;cursor:pointer;box-shadow:0 0 8px rgba(0,255,255,0.03);transition:transform .12s}
-.tile:hover{transform:translateY(-4px)}
-.tile .icon{width:48px;height:48px;margin:0 auto 8px;color:var(--accent)}
-.tile .title{font-size:0.95rem;margin-bottom:4px}
-.tile .sub{font-size:0.82rem;color:var(--muted)}
-.backbtn{background:transparent;border:0;color:var(--accent);cursor:pointer;margin-bottom:10px}
-.section{margin-top:14px}
-.subgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
-.card{background:#0f0f0f;border-radius:10px;padding:8px;text-align:center;position:relative}
-.card img{width:100%;height:70px;object-fit:contain;background:#000;padding:6px;border-radius:6px}
-.card .title{font-size:0.86rem;padding:6px}
-.card .links{font-size:0.85rem;padding-bottom:6px}
-.fav{position:absolute;top:8px;right:8px;font-size:16px;cursor:pointer}
-.fav.active{color:#ff0}
-.small{font-size:0.82rem;color:var(--muted)}
-.country-tile{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px;background:#111;border-radius:10px}
-.country-tile .left{display:flex;gap:10px;align-items:center}
-.country-tile .code{font-size:0.85rem;color:var(--muted)}
-.hide{display:none}
+body {
+  font-family: system-ui, sans-serif;
+  background: #0e0e0e;
+  color: #fff;
+  margin: 0;
+  padding: 0;
+}
+h1 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin: 20px 0 10px;
+}
+.tabs {
+  display: flex;
+  justify-content: center;
+  background: #111;
+  padding: 10px;
+  border-bottom: 1px solid #222;
+}
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 10px;
+  background: #222;
+  color: #0ff;
+  margin: 0 6px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+.tab.active {
+  background: #0ff;
+  color: #000;
+  transform: scale(1.05);
+}
+.search-container {
+  text-align: center;
+  margin: 12px 0;
+}
+.search-container input {
+  width: 80%;
+  max-width: 400px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  background: #1b1b1b;
+  color: #0ff;
+  text-align: center;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 18px;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.card {
+  background: #1b1b1b;
+  border-radius: 18px;
+  text-align: center;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 8px rgba(0, 255, 255, 0.1);
+  position: relative;
+}
+.card:hover {
+  transform: scale(1.06);
+  box-shadow: 0 5px 15px rgba(0,255,255,0.4);
+}
+.card img {
+  width: 100%;
+  height: 100px;
+  object-fit: contain;
+  background: #111;
+  padding: 10px;
+  transition: transform 0.3s ease;
+  border-bottom: 1px solid #222;
+}
+.card:hover img {
+  transform: scale(1.1);
+}
+.card span {
+  display: block;
+  font-size: 0.95rem;
+  margin-top: 8px;
+  font-weight: 600;
+  color: #fff;
+}
+.links {
+  margin: 10px 0 14px;
+}
+.links a {
+  color: #0ff;
+  margin: 0 6px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.links a:hover {
+  color: #ff0;
+}
+.live-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff1744;
+  color: white;
+  font-size: 0.75rem;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.hidden { display: none; }
 </style>
+
 <script>
-// We'll render categories -> subgrids entirely client-side using data embedded in the page.
-let TV_STREAMS = {{ tv_streams | tojson }};
-let COUNTRY_STREAMS = {{ countries | tojson }};
-let YOUTUBE_LIVE = {{ youtube_live | tojson }};
-let LOGOS = {{ logos | tojson }};
-
-function createSVG(svgStr){
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = svgStr;
-  return wrapper.firstElementChild;
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.grid').forEach(g => g.classList.add('hidden'));
+  document.getElementById(tab).classList.remove('hidden');
+  document.getElementById('tab_' + tab).classList.add('active');
+  document.getElementById("search").value = "";
+  filterChannels(""); // reset search
 }
 
-function onCategoryClick(cat){
-  // show category view and hide home grid
-  document.getElementById('home_view').classList.add('hide');
-  document.getElementById('category_view').classList.remove('hide');
-  document.getElementById('category_title').innerText = cat;
-  document.getElementById('category_subtitle').innerText = '';
-  // render
-  const container = document.getElementById('category_container');
-  container.innerHTML = '';
-  if(cat === '⭐ Favourites'){
-    renderFavouritesGrid(container);
-    return;
-  }
-  if(cat === '▶ YouTube'){
-    renderYouTubeGrid(container);
-    return;
-  }
-  if(cat === '🌍 Countries'){
-    renderCountriesList(container);
-    return;
-  }
-  // normal category from TV_STREAMS by matching key exactly
-  const channels = TV_STREAMS[cat] || {};
-  if(Object.keys(channels).length === 0){
-    container.innerHTML = '<p class="small">No channels found in this category.</p>';
-    return;
-  }
-  renderChannels(container, channels);
-}
-
-function backHome(){
-  document.getElementById('category_view').classList.add('hide');
-  document.getElementById('home_view').classList.remove('hide');
-  // reset search filter
-  const s = document.getElementById('search_input'); if(s) s.value = '';
-  searchAll('');
-}
-
-function renderChannels(container, channels){
-  const grid = document.createElement('div'); grid.className = 'subgrid';
-  Object.entries(channels).forEach(([key, info])=>{
-    const c = document.createElement('div'); c.className = 'card'; c.setAttribute('data-key', key); c.setAttribute('data-name', info.name || key);
-    const fav = document.createElement('div'); fav.className = 'fav'; fav.setAttribute('data-key', key); fav.innerText = '⭐'; fav.onclick = ()=>toggleFav(key);
-    c.appendChild(fav);
-    const img = document.createElement('img'); img.src = info.logo || 'https://i.imgur.com/BsC6z9S.png';
-    c.appendChild(img);
-    const title = document.createElement('div'); title.className = 'title'; title.innerText = info.name || key;
-    c.appendChild(title);
-    const links = document.createElement('div'); links.className = 'links';
-    const a1 = document.createElement('a'); a1.href = '/watch/' + key; a1.className='watch-link'; a1.innerText = '▶ Watch';
-    const a2 = document.createElement('a'); a2.href = '/audio/' + key; a2.innerText = ' 🎵 Audio'; a2.style.marginLeft='8px';
-    links.appendChild(a1); links.appendChild(a2);
-    c.appendChild(links);
-    grid.appendChild(c);
-  });
-  container.appendChild(grid);
-  updateFavIcons();
-}
-
-function renderYouTubeGrid(container){
-  const grid = document.createElement('div'); grid.className='subgrid';
-  YOUTUBE_LIVE.forEach(key=>{
-    const c = document.createElement('div'); c.className='card'; c.setAttribute('data-key', key); c.setAttribute('data-name', key);
-    const fav = document.createElement('div'); fav.className='fav'; fav.setAttribute('data-key', key); fav.innerText='⭐'; fav.onclick = ()=>toggleFav(key);
-    c.appendChild(fav);
-    const img = document.createElement('img'); img.src = LOGOS[key] || 'https://i.imgur.com/BsC6z9S.png';
-    c.appendChild(img);
-    const title = document.createElement('div'); title.className='title'; title.innerText = key.replace(/_/g,' ');
-    c.appendChild(title);
-    const links = document.createElement('div'); links.className='links';
-    const a1 = document.createElement('a'); a1.href = '/watch/' + key; a1.innerText = '▶ Watch';
-    const a2 = document.createElement('a'); a2.href = '/audio/' + key; a2.innerText = ' 🎵 Audio'; a2.style.marginLeft='8px';
-    links.appendChild(a1); links.appendChild(a2);
-    c.appendChild(links);
-    grid.appendChild(c);
-  });
-  container.appendChild(grid);
-  updateFavIcons();
-}
-
-function renderFavouritesGrid(container){
-  const favs = JSON.parse(localStorage.getItem('favs') || '[]');
-  if(favs.length === 0){
-    container.innerHTML = '<p class="small">No favourites yet. Add by tapping ⭐ on any channel.</p>';
-    return;
-  }
-  const grid = document.createElement('div'); grid.className='subgrid';
-  // attempt to find channel info from categories & countries
-  favs.forEach(key=>{
-    // search TV_STREAMS
-    let info = findChannelInfo(key);
-    if(info){
-      const c = document.createElement('div'); c.className='card'; c.setAttribute('data-key', key); c.setAttribute('data-name', info.name || key);
-      const fav = document.createElement('div'); fav.className='fav active'; fav.setAttribute('data-key', key); fav.innerText='⭐'; fav.onclick = ()=>toggleFav(key);
-      c.appendChild(fav);
-      const img = document.createElement('img'); img.src = info.logo || 'https://i.imgur.com/BsC6z9S.png';
-      c.appendChild(img);
-      const title = document.createElement('div'); title.className='title'; title.innerText = info.name || key;
-      c.appendChild(title);
-      const links = document.createElement('div'); links.className='links';
-      const a1 = document.createElement('a'); a1.href = '/watch/' + key; a1.innerText = '▶ Watch';
-      const a2 = document.createElement('a'); a2.href = '/audio/' + key; a2.innerText = ' 🎵 Audio'; a2.style.marginLeft='8px';
-      links.appendChild(a1); links.appendChild(a2);
-      c.appendChild(links);
-      grid.appendChild(c);
-    }
-  });
-  container.appendChild(grid);
-}
-
-function renderCountriesList(container){
-  // show a list of country tiles (name + code). clicking opens the country's channels
-  const fragment = document.createElement('div');
-  fragment.className='section';
-  const keys = Object.keys(COUNTRY_STREAMS).sort();
-  if(keys.length === 0){
-    fragment.innerHTML = '<p class="small">No countries available.</p>';
-    container.appendChild(fragment);
-    return;
-  }
-  // countries grid: simple list
-  const list = document.createElement('div'); list.style.display='grid'; list.style.gap='8px';
-  keys.forEach(cc=>{
-    const meta = COUNTRY_STREAMS[cc];
-    const t = document.createElement('div'); t.className='country-tile';
-    const left = document.createElement('div'); left.className='left';
-    const icon = document.createElement('div'); icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'; icon.style.color='#0ff';
-    const name = document.createElement('div'); name.innerHTML = `<div style="font-weight:600">${meta.country}</div><div class="code">${cc}</div>`;
-    left.appendChild(icon); left.appendChild(name);
-    const openBtn = document.createElement('button'); openBtn.innerText='Open'; openBtn.onclick = ()=>{ openCountryChannels(cc, meta.country); };
-    t.appendChild(left); t.appendChild(openBtn);
-    list.appendChild(t);
-  });
-  fragment.appendChild(list);
-  container.appendChild(fragment);
-}
-
-function openCountryChannels(cc, cname){
-  // show channels for a single country in the same category_view container
-  document.getElementById('category_title').innerText = cname + ' (' + cc + ')';
-  const container = document.getElementById('category_container');
-  container.innerHTML = '';
-  const meta = COUNTRY_STREAMS[cc];
-  if(!meta || !meta.channels){
-    container.innerHTML = '<p class="small">No channels for this country.</p>';
-    return;
-  }
-  renderChannels(container, meta.channels);
-}
-
-function findChannelInfo(key){
-  // search categories
-  for(const g in TV_STREAMS){
-    if(TV_STREAMS[g] && TV_STREAMS[g][key]) return TV_STREAMS[g][key];
-  }
-  // search countries
-  for(const cc in COUNTRY_STREAMS){
-    const chs = COUNTRY_STREAMS[cc].channels || {};
-    if(chs[key]) return chs[key];
-  }
-  // check if it's a youtube key (we treat youtube keys as simple names)
-  if(LOGOS[key] !== undefined){
-    return {"name": key, "logo": LOGOS[key], "url": null};
-  }
-  return null;
-}
-
-function toggleFav(key){
-  let favs = JSON.parse(localStorage.getItem('favs') || '[]');
-  if(favs.includes(key)){
-    favs = favs.filter(x=>x!==key);
-  } else {
-    favs.push(key);
-  }
-  localStorage.setItem('favs', JSON.stringify(favs));
-  updateFavIcons();
-}
-
-function updateFavIcons(){
-  const favs = JSON.parse(localStorage.getItem('favs') || '[]');
-  document.querySelectorAll('.fav').forEach(el=>{
-    const key = el.getAttribute('data-key');
-    if(favs.includes(key)) el.classList.add('active'); else el.classList.remove('active');
+function filterChannels(value) {
+  const term = value.toLowerCase();
+  document.querySelectorAll('.card').forEach(card => {
+    const name = card.getAttribute('data-name');
+    if (!term || name.includes(term)) card.style.display = '';
+    else card.style.display = 'none';
   });
 }
 
-// search across home tiles and visible cards
-function searchAll(term){
-  term = (term || '').toLowerCase();
-  // hide tiles that don't match (in home view)
-  document.querySelectorAll('.tile').forEach(t=>{
-    const name = (t.getAttribute('data-name')||'').toLowerCase();
-    t.style.display = name.includes(term) ? '' : 'none';
-  });
-  // also hide channel cards if any open
-  document.querySelectorAll('.card').forEach(c=>{
-    const nm = (c.getAttribute('data-name')||'').toLowerCase();
-    c.style.display = nm.includes(term) ? '' : 'none';
-  });
-}
-
+window.onload = () => showTab('tv');
 </script>
 </head>
+
 <body>
-<div class="header">
-  <h1>📺 IPTV — Categories</h1>
-  <div class="search"><input id="search_input" placeholder="Search categories or channels..." oninput="searchAll(this.value)"></div>
-</div>
+  <h1>📡 Live TV & YouTube Streams</h1>
 
-<!-- HOME GRID (categories as tiles) -->
-<div id="home_view">
-  <div class="main-grid">
-    {% for cat in categories %}
-      <div class="tile" onclick="onCategoryClick('{{ cat }}')" data-name="{{ cat }}">
-        <div class="icon">{{ category_svgs.get(cat, '')|safe }}</div>
-        <div class="title">{{ cat }}</div>
-        <div class="sub small">
-          {% if cat == '⭐ Favourites' %}Your starred channels{% elif cat == '▶ YouTube' %}Live YouTube streams{% elif cat == '🌍 Countries' %}Browse by country{% else %}Open category{% endif %}
-        </div>
+  <div class="tabs">
+    <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV Channels</div>
+    <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube Live</div>
+  </div>
+
+  <div class="search-container">
+    <input type="text" id="search" onkeyup="filterChannels(this.value)" placeholder="🔍 Search channels...">
+  </div>
+
+  <div id="tv" class="grid">
+  {% for key in tv_channels %}
+    <div class="card" data-name="{{ key.replace('_',' ').lower() }}">
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+      <span>{{ key.replace('_',' ').title() }}</span>
+      <div class="links">
+        <a href="/watch/{{ key }}">▶ Watch</a>
+        <a href="/audio/{{ key }}">🎵 Audio</a>
       </div>
-    {% endfor %}
-  </div>
-</div>
-
-<!-- CATEGORY VIEW (hidden by default) -->
-<div id="category_view" class="hide">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-    <button class="backbtn" onclick="backHome()">🔙 Back</button>
-    <div>
-      <div id="category_title" style="font-weight:700"></div>
-      <div id="category_subtitle" class="small"></div>
     </div>
+  {% endfor %}
   </div>
-  <div id="category_container"></div>
-</div>
 
+  <div id="youtube" class="grid hidden">
+  {% for key in youtube_channels %}
+    <div class="card" data-name="{{ key.replace('_',' ').lower() }}">
+      <div class="live-badge">LIVE 🔴</div>
+      <img src="{{ logos.get(key) }}" alt="{{ key }}">
+      <span>{{ key.replace('_',' ').title() }}</span>
+      <div class="links">
+        <a href="/watch/{{ key }}">▶ Watch</a>
+        <a href="/audio/{{ key }}">🎵 Audio</a>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
 </body>
 </html>
 """
-    return render_template_string(html,
-                                  tv_streams=TV_STREAMS,
-                                  countries=COUNTRY_STREAMS,
-                                  youtube_live=[k for k,v in LIVE_STATUS.items() if v],
-                                  logos=CHANNEL_LOGOS,
-                                  category_svgs=category_svgs,
-                                  categories=["⭐ Favourites", "▶ YouTube"] + [g for g in IPTV_SOURCES.keys() if g != "🌍 Countries"] + ["🌍 Countries"])
-
+    return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
+    
 # -----------------------
-# Helper: find channel URL
-# -----------------------
-def find_channel_url(channel_key):
-    for group, chs in TV_STREAMS.items():
-        if channel_key in chs:
-            return chs[channel_key]["url"]
-    for cc, meta in COUNTRY_STREAMS.items():
-        chs = meta.get("channels", {})
-        if channel_key in chs:
-            return chs[channel_key]["url"]
-    if channel_key in CACHE:
-        return CACHE[channel_key]
-    return None
-
-# -----------------------
-# Watch endpoint (works across categories and countries and youtube)
+# Watch Route
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
-    # find the streaming URL
-    url = None
-    for group, chs in TV_STREAMS.items():
-        if channel in chs:
-            url = chs[channel]["url"]
-            break
-    if not url and channel in CACHE:
-        url = CACHE[channel]
-    if not url:
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = tv_channels + live_youtube
+    if channel not in all_channels:
         abort(404)
 
-    # HTML with both HLS and DASH support
+    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
+    current_index = all_channels.index(channel)
+    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
+    next_channel = all_channels[(current_index + 1) % len(all_channels)]
+
     html = f"""
-<!DOCTYPE html>
 <html>
 <head>
-<meta name='viewport' content='width=device-width,initial-scale=1.0'>
-<title>{channel}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{channel.replace('_',' ').title()}</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
 <style>
-  body {{ background:#000; color:#0ff; text-align:center; margin:0; }}
-  video {{ width:96%; max-width:720px; height:auto; background:#000; margin-top:10px; }}
-  a {{ color:#0ff; text-decoration:none; }}
+body {{ background:#000; color:#fff; text-align:center; margin:0; padding:10px; }}
+video {{ width:95%; max-width:720px; height:auto; background:#000; border:1px solid #333; }}
+a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-size:18px; }}
 </style>
-</head>
-<body>
-<h3>{channel.replace('_',' ').title()}</h3>
-<video id="v" controls autoplay playsinline></video>
-<p><a href="/">🏠 Home</a></p>
-
 <script>
-document.addEventListener("DOMContentLoaded",function(){{
-  const v = document.getElementById("v");
-  const src = "{url}";
-  console.log("Trying source:", src);
-
-  if (src.endsWith(".m3u8")) {{
-    if (v.canPlayType("application/vnd.apple.mpegurl")) {{
-      v.src = src;
-    }} else if (Hls.isSupported()) {{
-      const h = new Hls();
-      h.loadSource(src);
-      h.attachMedia(v);
-      h.on(Hls.Events.ERROR, function(e, data) {{
-        console.error("HLS error", data);
-      }});
-    }} else {{
-      v.src = src;
-    }}
-  }} else if (src.endsWith(".mpd")) {{
-    const player = dashjs.MediaPlayer().create();
-    player.initialize(v, src, true);
+document.addEventListener("DOMContentLoaded", function() {{
+  const video = document.getElementById("player");
+  const src = "{video_url}";
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+    video.src = src;
+  }} else if (Hls.isSupported()) {{
+    const hls = new Hls({{lowLatencyMode:true}});
+    hls.loadSource(src);
+    hls.attachMedia(video);
   }} else {{
-    v.src = src;
+    alert("⚠️ Browser cannot play HLS stream.");
   }}
-
-  v.addEventListener('error', e => {{
-    console.error("Video error:", e);
-    alert("⚠️ Unable to play stream. Try audio mode instead.");
-  }});
+}});
+document.addEventListener("keydown", function(e) {{
+  const v=document.getElementById("player");
+  if(e.key==="4")window.location.href="/watch/{prev_channel}";
+  if(e.key==="6")window.location.href="/watch/{next_channel}";
+  if(e.key==="0")window.location.href="/";
+  if(e.key==="5"&&v){{v.paused?v.play():v.pause();}}
+  if(e.key==="9")window.location.reload();
 }});
 </script>
+</head>
+<body>
+<h2>{channel.replace('_',' ').title()}</h2>
+<video id="player" controls autoplay playsinline></video>
+<div style="margin-top:15px;">
+  <a href="/">⬅ Home</a>
+  <a href="/watch/{prev_channel}">⏮ Prev</a>
+  <a href="/watch/{next_channel}">⏭ Next</a>
+  <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
+</div>
 </body>
-</html>
-"""
+</html>"""
     return html
+
 # -----------------------
-# Audio proxy (ffmpeg)
+# Proxy Stream
 # -----------------------
-@app.route("/audio/<channel>")
-def audio(channel):
-    url = find_channel_url(channel)
+@app.route("/stream/<channel>")
+def stream(channel):
+    url = CACHE.get(channel)
     if not url:
-        return "Not ready", 503
+        return "Channel not ready", 503
+
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        return f"Error fetching stream: {e}", 502
+
+    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
+    return Response(r.content, content_type=content_type)
+
+@app.route("/audio/<channel>")
+def audio_only(channel):
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
+
+    filename = f"{channel}.mp3"
 
     def generate():
-        cmd = ["ffmpeg", "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-f", "mp3", "pipe:1"]
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        cmd = [
+            "ffmpeg", "-i", url,
+            "-vn",               # no video
+            "-ac", "1",          # mono
+            "-b:a", "40k",       # 40kbps
+            "-f", "mp3",
+            "pipe:1"
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
-                data = p.stdout.read(1024)
+                data = proc.stdout.read(1024)
                 if not data:
                     break
                 yield data
         finally:
-            try:
-                p.terminate()
-            except Exception:
-                pass
+            proc.terminate()
 
-    return Response(generate(), mimetype="audio/mpeg")
+    return Response(
+        generate(),
+        mimetype="audio/mpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 # -----------------------
-# Run
+# Run Server
 # -----------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=8000, debug=False)
