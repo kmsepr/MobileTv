@@ -39,6 +39,9 @@ TV_STREAMS = {}         # category_name -> {channel_key: info}
 COUNTRY_STREAMS = {}    # country_code -> {country: name, channels: {...}}
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+
+"asianet_news": "https://www.youtube.com/@asianetnews/live",
+
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
