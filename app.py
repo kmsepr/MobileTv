@@ -24,7 +24,7 @@ TV_STREAMS = {
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
     "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
 
-"N1": "https://best-str.umn.cdn.united.cloud/stream?stream=sp1400&sp=n1info&channel=n1bos&u=n1info&p=n1Sh4redSecre7iNf0&player=m3u8&fbclid=IwZXh0bgNhZW0CMTEAAR6ZN090EKywHed5WsHI4ySE0WyAuWUMs4h8cV1RzpGxdAnsRY2lj268zKI9AA_aem_yHF0XvEo_IpsDvXjMk6nVQ",
+"asianet_news": "asianetnews.vgcdn.net/ptnr-Embed/v1/manifest/611d79b11b77e2f571934fd80ca1413453772ac7/1c19363c-e4a0-4e4d-ba28-771d5615b88e/54358811-f59d-4150-b8bc-c2e8714b953c/0.m3u8",
 }
 
 
