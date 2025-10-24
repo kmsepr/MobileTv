@@ -140,7 +140,7 @@ h1 { text-align:center; margin:15px 0; color:#0ff; }
 .tab { flex:1; padding:10px; text-align:center; cursor:pointer; color:#0ff; font-weight:bold; white-space:nowrap; }
 .tab.active { background:#0ff; color:#000; }
 .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:15px; padding:15px; }
-.card { background:#1a1a1a; border-radius:12px; text-align:center; overflow:hidden; box-shadow:0 0 5px rgba(0,255,255,0.3); transition:0.3s; }
+.card { background:#1a1a1a; border-radius:12px; text-align:center; overflow:hidden; box-shadow:0 0 5px rgba(0,255,255,0.3); transition:0.3s; position:relative; }
 .card:hover { transform:scale(1.05); }
 .card img { width:100%; height:80px; object-fit:contain; background:#000; }
 .card span { display:block; padding:6px; font-size:0.9rem; }
@@ -148,6 +148,8 @@ h1 { text-align:center; margin:15px 0; color:#0ff; }
 .hidden { display:none; }
 .search { text-align:center; margin:10px; }
 .search input { padding:8px 12px; width:80%; max-width:400px; background:#222; border:none; color:#0ff; border-radius:8px; }
+.fav { position:absolute; top:6px; right:6px; cursor:pointer; font-size:18px; }
+.fav.active { color:#ff0; }
 </style>
 <script>
 function showTab(tab){
@@ -155,7 +157,9 @@ function showTab(tab){
   document.querySelectorAll('.grid').forEach(g=>g.classList.add('hidden'));
   document.getElementById(tab).classList.remove('hidden');
   document.getElementById('tab_'+tab).classList.add('active');
+  localStorage.setItem('lastTab', tab);
 }
+
 function filter(v){
   const term=v.toLowerCase();
   document.querySelectorAll('.card').forEach(c=>{
@@ -163,15 +167,52 @@ function filter(v){
     c.style.display = n.includes(term)?'':'none';
   });
 }
+
+function toggleFav(key){
+  let favs = JSON.parse(localStorage.getItem('favs')||'[]');
+  if(favs.includes(key)){
+    favs = favs.filter(x=>x!==key);
+  }else{
+    favs.push(key);
+  }
+  localStorage.setItem('favs', JSON.stringify(favs));
+  renderFavs();
+}
+
+function renderFavs(){
+  const favs = JSON.parse(localStorage.getItem('favs')||'[]');
+  document.querySelectorAll('.fav').forEach(f=>{
+    const key=f.getAttribute('data-key');
+    f.classList.toggle('active', favs.includes(key));
+  });
+  const favGrid=document.getElementById('favourites');
+  if(!favGrid)return;
+  favGrid.innerHTML='';
+  document.querySelectorAll('.card').forEach(c=>{
+    if(favs.includes(c.getAttribute('data-name'))){
+      favGrid.appendChild(c.cloneNode(true));
+    }
+  });
+  if(favs.length===0){
+    favGrid.innerHTML='<p style="text-align:center;color:#888;">No favourites yet ⭐</p>';
+  }
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const last = localStorage.getItem('lastTab') || 'g1';
+  showTab(last);
+  renderFavs();
+});
 </script>
 </head>
 <body>
 <h1>📺 IPTV + YouTube Live</h1>
 <div class="tabs">
   {% for group in tv_groups %}
-    <div class="tab" id="tab_{{ loop.index }}" onclick="showTab('g{{ loop.index }}')">{{ group }}</div>
+    <div class="tab" id="tab_g{{ loop.index }}" onclick="showTab('g{{ loop.index }}')">{{ group }}</div>
   {% endfor %}
   <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube</div>
+  <div class="tab" id="tab_favourites" onclick="showTab('favourites')">⭐ Favourites</div>
 </div>
 <div class="search"><input type="text" onkeyup="filter(this.value)" placeholder="🔍 Search channels..."></div>
 
@@ -179,6 +220,7 @@ function filter(v){
 <div class="grid {% if not loop.first %}hidden{% endif %}" id="g{{ loop.index }}">
   {% for key, info in channels.items() %}
   <div class="card" data-name="{{ key }}">
+    <div class="fav" data-key="{{ key }}" onclick="toggleFav('{{ key }}')">⭐</div>
     <img src="{{ info.logo or 'https://i.imgur.com/BsC6z9S.png' }}" alt="{{ info.name }}">
     <span>{{ info.name }}</span>
     <div class="links">
@@ -193,6 +235,7 @@ function filter(v){
 <div class="grid hidden" id="youtube">
   {% for key in youtube_live %}
   <div class="card" data-name="{{ key }}">
+    <div class="fav" data-key="{{ key }}" onclick="toggleFav('{{ key }}')">⭐</div>
     <img src="{{ logos.get(key) }}" alt="{{ key }}">
     <span>{{ key.replace('_',' ').title() }}</span>
     <div class="links">
@@ -202,7 +245,8 @@ function filter(v){
   </div>
   {% endfor %}
 </div>
-<script>showTab('g1');</script>
+
+<div class="grid hidden" id="favourites"></div>
 </body>
 </html>
 """
