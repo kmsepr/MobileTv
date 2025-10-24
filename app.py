@@ -25,6 +25,8 @@ TV_STREAMS = {
     "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
 
 "asianet_news": "asianetnews.vgcdn.net/ptnr-Embed/v1/manifest/611d79b11b77e2f571934fd80ca1413453772ac7/1c19363c-e4a0-4e4d-ba28-771d5615b88e/54358811-f59d-4150-b8bc-c2e8714b953c/0.m3u8",
+
+"asianet_movies": "https://live.dinesh29.com.np/stream/jiotvplus/asianetmovieshd/master.m3u8",
 }
 
 
