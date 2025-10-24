@@ -540,26 +540,60 @@ def find_channel_url(channel_key):
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
-    url = find_channel_url(channel)
-    if not url:
-        abort(404)
+    stream_url = f"/stream/{channel}"  # proxy always works
     html = f"""
-<html><head><meta name='viewport' content='width=device-width,initial-scale=1.0'>
+<html>
+<head>
+<meta name='viewport' content='width=device-width,initial-scale=1.0'>
 <title>{channel}</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<style>body{{background:#000;color:#0ff;text-align:center;}}video{{width:96%;max-width:720px;}}</style>
-<script>
-document.addEventListener("DOMContentLoaded",function(){{
-const v=document.getElementById("v");
-const s="{url}";
-if(v.canPlayType("application/vnd.apple.mpegurl"))v.src=s;
-else if(Hls.isSupported()){{const h=new Hls();h.loadSource(s);h.attachMedia(v);}}
-}});
-</script></head>
-<body><h3>{channel.replace('_',' ').title()}</h3><video id="v" controls autoplay></video>
-<p><a href="/">🏠 Home</a></p></body></html>"""
-    return html
+<script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+<style>
+  body {{
+    background:#000;
+    color:#0ff;
+    text-align:center;
+    font-family:sans-serif;
+  }}
+  video {{
+    width:96%;
+    max-width:720px;
+    height:auto;
+    background:#000;
+  }}
+  a {{
+    color:#0ff;
+    text-decoration:none;
+  }}
+</style>
+</head>
+<body>
+<h3>{channel.replace('_',' ').title()}</h3>
+<video id="v" controls autoplay></video>
+<p><a href="/">🏠 Home</a></p>
 
+<script>
+document.addEventListener("DOMContentLoaded", function() {{
+  const v = document.getElementById("v");
+  const s = "{stream_url}";
+  if (s.endsWith(".m3u8")) {{
+    if (v.canPlayType("application/vnd.apple.mpegurl")) v.src = s;
+    else if (Hls.isSupported()) {{
+      const h = new Hls();
+      h.loadSource(s);
+      h.attachMedia(v);
+    }}
+  }} else if (s.endsWith(".mpd")) {{
+    const player = dashjs.MediaPlayer().create();
+    player.initialize(v, s, true);
+  }} else {{
+    v.src = s; // proxy mp4/mp3 stream
+  }}
+}});
+</script>
+</body>
+</html>"""
+    return html
 # -----------------------
 # Audio proxy (ffmpeg)
 # -----------------------
