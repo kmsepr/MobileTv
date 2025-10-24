@@ -57,7 +57,7 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
-    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
+    "kas_ranker": "https://www.youtube.com/@kasrankerofficial/live",
 }
 
 CHANNEL_LOGOS = {k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
