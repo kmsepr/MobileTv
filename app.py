@@ -20,19 +20,21 @@ app = Flask(__name__)
 # -----------------------
 # IPTV Categories to Load
 # -----------------------
+# -----------------------
+# IPTV Categories to Load
+# -----------------------
 IPTV_SOURCES = {
     "🇮🇳 India": "https://iptv-org.github.io/iptv/countries/in.m3u",
     "🗣️ Malayalam": "https://iptv-org.github.io/iptv/languages/mal.m3u",
-    "🕌 Islamic": "https://iptv-org.github.io/iptv/categories/religious.m3u",
+    "🕌 Religious": "https://iptv-org.github.io/iptv/categories/religious.m3u",
     "📰 News": "https://iptv-org.github.io/iptv/categories/news.m3u",
     "⚽ Sports": "https://iptv-org.github.io/iptv/categories/sports.m3u",
     "🎬 Entertainment": "https://iptv-org.github.io/iptv/categories/entertainment.m3u",
     "🎓 Education": "https://iptv-org.github.io/iptv/categories/education.m3u",
-    "📚 Infotainment": "https://iptv-org.github.io/iptv/categories/infotainment.m3u",
     "🎵 Music": "https://iptv-org.github.io/iptv/categories/music.m3u",
     "🎥 Movies": "https://iptv-org.github.io/iptv/categories/movies.m3u",
     "🧒 Kids": "https://iptv-org.github.io/iptv/categories/kids.m3u",
-    "🌍 World": "https://iptv-org.github.io/iptv/index.m3u"
+    "🌍 Countries": "https://iptv-org.github.io/iptv/index.country.m3u"
 }
 
 TV_STREAMS = {}
