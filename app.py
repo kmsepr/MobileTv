@@ -543,8 +543,20 @@ def find_channel_url(channel_key):
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
-    stream_url = f"/stream/{channel}"  # proxy always works
+    # find the streaming URL
+    url = None
+    for group, chs in TV_STREAMS.items():
+        if channel in chs:
+            url = chs[channel]["url"]
+            break
+    if not url and channel in CACHE:
+        url = CACHE[channel]
+    if not url:
+        abort(404)
+
+    # HTML with both HLS and DASH support
     html = f"""
+<!DOCTYPE html>
 <html>
 <head>
 <meta name='viewport' content='width=device-width,initial-scale=1.0'>
@@ -552,50 +564,51 @@ def watch(channel):
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
 <style>
-  body {{
-    background:#000;
-    color:#0ff;
-    text-align:center;
-    font-family:sans-serif;
-  }}
-  video {{
-    width:96%;
-    max-width:720px;
-    height:auto;
-    background:#000;
-  }}
-  a {{
-    color:#0ff;
-    text-decoration:none;
-  }}
+  body {{ background:#000; color:#0ff; text-align:center; margin:0; }}
+  video {{ width:96%; max-width:720px; height:auto; background:#000; margin-top:10px; }}
+  a {{ color:#0ff; text-decoration:none; }}
 </style>
 </head>
 <body>
 <h3>{channel.replace('_',' ').title()}</h3>
-<video id="v" controls autoplay></video>
+<video id="v" controls autoplay playsinline></video>
 <p><a href="/">🏠 Home</a></p>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {{
+document.addEventListener("DOMContentLoaded",function(){{
   const v = document.getElementById("v");
-  const s = "{stream_url}";
-  if (s.endsWith(".m3u8")) {{
-    if (v.canPlayType("application/vnd.apple.mpegurl")) v.src = s;
-    else if (Hls.isSupported()) {{
+  const src = "{url}";
+  console.log("Trying source:", src);
+
+  if (src.endsWith(".m3u8")) {{
+    if (v.canPlayType("application/vnd.apple.mpegurl")) {{
+      v.src = src;
+    }} else if (Hls.isSupported()) {{
       const h = new Hls();
-      h.loadSource(s);
+      h.loadSource(src);
       h.attachMedia(v);
+      h.on(Hls.Events.ERROR, function(e, data) {{
+        console.error("HLS error", data);
+      }});
+    }} else {{
+      v.src = src;
     }}
-  }} else if (s.endsWith(".mpd")) {{
+  }} else if (src.endsWith(".mpd")) {{
     const player = dashjs.MediaPlayer().create();
-    player.initialize(v, s, true);
+    player.initialize(v, src, true);
   }} else {{
-    v.src = s; // proxy mp4/mp3 stream
+    v.src = src;
   }}
+
+  v.addEventListener('error', e => {{
+    console.error("Video error:", e);
+    alert("⚠️ Unable to play stream. Try audio mode instead.");
+  }});
 }});
 </script>
 </body>
-</html>"""
+</html>
+"""
     return html
 # -----------------------
 # Audio proxy (ffmpeg)
