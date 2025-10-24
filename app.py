@@ -23,7 +23,11 @@ TV_STREAMS = {
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
     "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
+
+"N1": "https://best-str.umn.cdn.united.cloud/stream?stream=sp1400&sp=n1info&channel=n1bos&u=n1info&p=n1Sh4redSecre7iNf0&player=m3u8&fbclid=IwZXh0bgNhZW0CMTEAAR6ZN090EKywHed5WsHI4ySE0WyAuWUMs4h8cV1RzpGxdAnsRY2lj268zKI9AA_aem_yHF0XvEo_IpsDvXjMk6nVQ",
 }
+
+
 
 # -----------------------
 # YouTube Live Channels
