@@ -21,7 +21,7 @@ TV_STREAMS = {
     
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
 
-"star_sports": "http://116.90.120.149:8000/play/a0ba/index.m3u8",
+"star_sports": "http://87.255.35.150:18828/",
      
 }
 
