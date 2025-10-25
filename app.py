@@ -58,7 +58,7 @@ YOUTUBE_STREAMS = {
 # -----------------------
 CHANNEL_LOGOS = {
 
-"star_sports": "https://imgur.com/E5jjKHI. png",
+"star_sports": "https://imgur.com/5En7pOI.png",
 
 
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
