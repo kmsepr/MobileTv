@@ -20,6 +20,8 @@ TV_STREAMS = {
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
     
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
+
+"star_sports": "http://116.90.120.149:8000/play/a0ba/index.m3u8",
      
 }
 
@@ -55,6 +57,10 @@ YOUTUBE_STREAMS = {
 # Channel Logos
 # -----------------------
 CHANNEL_LOGOS = {
+
+"star_sports": "https://imgur.com/E5jjKHI. png",
+
+
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
     "victers_tv": "https://i.imgur.com/kj4OEsb.png",
     "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
