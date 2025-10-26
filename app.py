@@ -31,6 +31,8 @@ TV_STREAMS = {
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
+
+
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
@@ -51,6 +53,8 @@ YOUTUBE_STREAMS = {
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
     "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
+
+"suprabhatam": "https://www.youtube.com/@suprabhaatham_online/live",
 }
 
 # -----------------------
