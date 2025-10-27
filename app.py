@@ -31,7 +31,7 @@ TV_STREAMS = {
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
-
+    "asianet_news": "https://www.youtube.com/@asianetnews/live",
 
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
