@@ -407,21 +407,27 @@ def audio(channel):
 
     def generate():
         while True:
-            cmd = [
-                "ffmpeg",
-                "-reconnect", "1",
-                "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "10",
-                "-i", url,
-                "-vn",
-                "-ac", "1",
-                "-b:a", "40k",
-                "-ar", "44100",
-                "-fflags", "nobuffer",
-                "-flags", "low_delay",
-                "-f", "mp3",
-                "pipe:1"
-            ]
+           cmd = [
+    "ffmpeg",
+    "-hide_banner",
+    "-loglevel", "error",
+    "-fflags", "+genpts+nobuffer",
+    "-flags", "low_delay",
+    "-reconnect", "1",
+    "-reconnect_streamed", "1",
+    "-reconnect_delay_max", "10",
+    "-timeout", "10000000",
+    "-i", url,
+    "-vn",
+    "-ac", "1",
+    "-b:a", "40k",
+    "-ar", "44100",
+    "-bufsize", "64k",
+    "-flush_packets", "1",
+    "-max_delay", "1000000",
+    "-f", "mp3",
+    "pipe:1"
+]
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             try:
                 for chunk in iter(lambda: proc.stdout.read(8192), b""):
