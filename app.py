@@ -411,20 +411,24 @@ def audio(channel):
     "ffmpeg",
     "-hide_banner",
     "-loglevel", "error",
-    "-fflags", "+genpts+nobuffer",
+    # 💡 Stabilize live segment timing
+    "-fflags", "+nobuffer+genpts+discardcorrupt",
     "-flags", "low_delay",
     "-reconnect", "1",
     "-reconnect_streamed", "1",
     "-reconnect_delay_max", "10",
-    "-timeout", "10000000",
+    "-rw_timeout", "15000000",
+    "-timeout", "15000000",
+    "-seekable", "0",          # force non-seekable live stream
+    "-live_start_index", "0",  # start at live edge (no backlog)
     "-i", url,
     "-vn",
     "-ac", "1",
-    "-b:a", "40k",
     "-ar", "44100",
+    "-b:a", "40k",
     "-bufsize", "64k",
     "-flush_packets", "1",
-    "-max_delay", "1000000",
+    "-max_delay", "500000",
     "-f", "mp3",
     "pipe:1"
 ]
