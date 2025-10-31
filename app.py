@@ -35,7 +35,7 @@ YOUTUBE_STREAMS = {
 
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
-    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
+    "qasimi": "https://youtube.com/@shaykhrahmathullahofficial/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
