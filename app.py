@@ -35,7 +35,7 @@ YOUTUBE_STREAMS = {
 
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
-    "qasimi": "https://youtube.com/@shaykhrahmathullahofficial/live",
+    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
@@ -384,67 +384,54 @@ document.addEventListener("keydown", function(e) {{
 # -----------------------
 # Proxy Stream
 # -----------------------
-# ==============================================================
-# 🎥 Video: Direct M3U8 passthrough
-# 🎧 Audio: FFmpeg proxy (40 kbps mono MP3)
-# ==============================================================
-
 @app.route("/stream/<channel>")
 def stream(channel):
-    """Serve direct M3U8 link (no FFmpeg)."""
-    url = CACHE.get(channel) or TV_STREAMS.get(channel)
+    url = CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
-    return Response(url, mimetype="application/vnd.apple.mpegurl")
 
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        return f"Error fetching stream: {e}", 502
+
+    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
+    return Response(r.content, content_type=content_type)
 
 @app.route("/audio/<channel>")
-def audio(channel):
-    """Serve FFmpeg-transcoded audio-only MP3 stream."""
-    url = CACHE.get(channel) or TV_STREAMS.get(channel)
+def audio_only(channel):
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
 
-    def generate():
-        while True:
-           cmd = [
-    "ffmpeg",
-    "-hide_banner",
-    "-loglevel", "error",
-    # 💡 Stabilize live segment timing
-    "-fflags", "+nobuffer+genpts+discardcorrupt",
-    "-flags", "low_delay",
-    "-reconnect", "1",
-    "-reconnect_streamed", "1",
-    "-reconnect_delay_max", "10",
-    "-rw_timeout", "15000000",
-    "-timeout", "15000000",
-    "-seekable", "0",          # force non-seekable live stream
-    "-live_start_index", "0",  # start at live edge (no backlog)
-    "-i", url,
-    "-vn",
-    "-ac", "1",
-    "-ar", "44100",
-    "-b:a", "64k",
-    "-bufsize", "1024k",
-    "-flush_packets", "1",
-    "-max_delay", "500000",
-    "-f", "mp3",
-    "pipe:1"
-]
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            try:
-                for chunk in iter(lambda: proc.stdout.read(8192), b""):
-                    yield chunk
-            except GeneratorExit:
-                proc.kill()
-                break
-            except Exception:
-                proc.kill()
-                time.sleep(3)
-                continue
+    filename = f"{channel}.mp3"
 
-    return Response(generate(), mimetype="audio/mpeg")
+    def generate():
+        cmd = [
+            "ffmpeg", "-i", url,
+            "-vn",               # no video
+            "-ac", "1",          # mono
+            "-b:a", "40k",       # 40kbps
+            "-f", "mp3",
+            "pipe:1"
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
+
+    return Response(
+        generate(),
+        mimetype="audio/mpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 # -----------------------
 # Run Server
