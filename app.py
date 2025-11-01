@@ -413,7 +413,7 @@ def audio_only(channel):
             "ffmpeg", "-i", url,
             "-vn",               # no video
             "-ac", "1",          # mono
-            "-b:a", "40k",       # 40kbps
+            "-b:a", "64k",       # 64kbps
             "-f", "mp3",
             "pipe:1"
         ]
