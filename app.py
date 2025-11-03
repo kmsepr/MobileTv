@@ -1,11 +1,55 @@
+import os
 import time
 import threading
 import logging
-from flask import Flask, Response, render_template_string, abort, request
-import subprocess, os, requests
+import subprocess
+import requests
+from flask import Flask, Response, render_template_string, abort, request, send_file
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
 app = Flask(__name__)
+
+MP3_DIR = "youtube2mp3"
+os.makedirs(MP3_DIR, exist_ok=True)
+
+@app.route("/")
+@app.route("/youtube2mp3")
+def list_mp3_files():
+    files = sorted(
+        [f for f in os.listdir(MP3_DIR) if f.endswith(".mp3")],
+        key=lambda x: os.path.getmtime(os.path.join(MP3_DIR, x)),
+        reverse=True
+    )
+
+    html = """
+    <html>
+    <head>
+        <title>YouTube2MP3 Files</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body { font-family: sans-serif; background: #111; color: #eee; padding: 10px; }
+            a { color: #4fc3f7; text-decoration: none; }
+            li { margin: 5px 0; padding: 5px; border-bottom: 1px solid #333; }
+        </style>
+    </head>
+    <body>
+        <h2>🎵 Saved MP3 Files</h2>
+        {% if files %}
+        <ul>
+        {% for f in files %}
+            <li><a href="/youtube2mp3/{{ f }}" target="_blank">{{ f }}</a></li>
+        {% endfor %}
+        </ul>
+        {% else %}
+        <p>No MP3 files yet.</p>
+        {% endif %}
+    </body>
+    </html>
+    """
+    return render_template_string(html, files=files)
 
 # -----------------------
 # TV Streams (direct m3u8)
