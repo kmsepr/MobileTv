@@ -436,55 +436,83 @@ def audio_only(channel):
 # -----------------------
 # YouTube to MP3 (16 kbps mono)
 # -----------------------
+# -----------------------
+# YouTube to MP3 (16 kbps mono)
+# -----------------------
 @app.route("/youtube2mp3", methods=["GET", "POST"])
 def youtube2mp3():
+    SAVE_DIR = "youtube2mp3"
+    os.makedirs(SAVE_DIR, exist_ok=True)
+
     if request.method == "GET":
-        # Simple paste form
-        return """
+        # List all saved MP3 files
+        files = sorted(
+            [f for f in os.listdir(SAVE_DIR) if f.endswith(".mp3")],
+            key=lambda x: os.path.getmtime(os.path.join(SAVE_DIR, x)),
+            reverse=True
+        )
+
+        html = """
         <html>
-        <head><title>🎧 YouTube → 16kbps MP3</title></head>
-        <body style="background:#000;color:#0f0;text-align:center;font-family:system-ui;">
+        <head>
+        <title>🎧 YouTube → 16kbps MP3</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body { background:#000; color:#0f0; font-family:system-ui; text-align:center; padding:10px; }
+            input { width:80%; padding:10px; border-radius:8px; border:none; }
+            button { padding:10px 20px; border:none; border-radius:8px; background:#0f0; color:#000; font-weight:bold; margin-top:10px; }
+            a { color:#0ff; text-decoration:none; }
+            ul { list-style:none; padding:0; margin-top:20px; text-align:left; display:inline-block; }
+            li { margin:6px 0; }
+        </style>
+        </head>
+        <body>
         <h2>🎧 Convert YouTube → 16kbps MP3</h2>
         <form action="/youtube2mp3" method="post">
-          <input type="text" name="url" placeholder="Paste YouTube URL" style="width:80%;padding:10px;border-radius:8px;border:none;">
-          <br><br>
-          <button type="submit" style="padding:10px 20px;border:none;border-radius:8px;background:#0f0;color:#000;font-weight:bold;">Convert & Play</button>
+          <input type="text" name="url" placeholder="Paste YouTube URL">
+          <br>
+          <button type="submit">Convert & Play</button>
         </form>
-        <br><a href="/" style="color:#0ff;">⬅ Home</a>
+        <br><a href="/">⬅ Home</a>
+
+        <h3>Saved MP3 Files</h3>
+        {% if files %}
+        <ul>
+        {% for f in files %}
+          <li><a href="/youtube2mp3/{{ f }}" target="_blank">{{ f }}</a></li>
+        {% endfor %}
+        </ul>
+        {% else %}
+        <p>No MP3 files yet.</p>
+        {% endif %}
         </body></html>
         """
+        return render_template_string(html, files=files)
 
-    # POST: convert YouTube to MP3 16kbps mono
+    # POST: convert YouTube to MP3 (and save)
     url = request.form.get("url", "").strip()
     if not url:
         return "Missing YouTube URL", 400
 
-    def generate():
-        cmd = [
-            "yt-dlp", "-f", "bestaudio", "-o", "-", url,
-            "-q", "--no-playlist"
-        ]
-        proc_ytdlp = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    # Generate filename
+    ts = int(time.time())
+    filename = os.path.join(SAVE_DIR, f"yt_{ts}.mp3")
 
-        ffmpeg_cmd = [
-            "ffmpeg", "-i", "pipe:0",
-            "-ac", "1", "-b:a", "16k",
-            "-f", "mp3", "pipe:1"
-        ]
-        proc_ffmpeg = subprocess.Popen(ffmpeg_cmd, stdin=proc_ytdlp.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        proc_ytdlp.stdout.close()
+    cmd = [
+        "yt-dlp", "-f", "bestaudio", "-o", "-", url,
+        "-q", "--no-playlist"
+    ]
+    proc_ytdlp = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-        try:
-            while True:
-                chunk = proc_ffmpeg.stdout.read(1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            proc_ytdlp.terminate()
-            proc_ffmpeg.terminate()
+    ffmpeg_cmd = [
+        "ffmpeg", "-i", "pipe:0",
+        "-ac", "1", "-b:a", "16k",
+        "-f", "mp3", filename
+    ]
+    subprocess.run(ffmpeg_cmd, stdin=proc_ytdlp.stdout)
+    proc_ytdlp.stdout.close()
 
-    return Response(generate(), mimetype="audio/mpeg", headers={"Content-Disposition": 'inline; filename="youtube.mp3"'})
+    return f'<html><body style="background:#000;color:#0f0;text-align:center;"><h3>✅ Saved as <a href="/youtube2mp3/{os.path.basename(filename)}">{os.path.basename(filename)}</a></h3><a href="/youtube2mp3" style="color:#0ff;">⬅ Back</a></body></html>'
 
 # -----------------------
 # Run Server
