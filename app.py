@@ -432,6 +432,60 @@ def audio_only(channel):
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
+
+# -----------------------
+# YouTube to MP3 (16 kbps mono)
+# -----------------------
+@app.route("/youtube2mp3", methods=["GET", "POST"])
+def youtube2mp3():
+    if request.method == "GET":
+        # Simple paste form
+        return """
+        <html>
+        <head><title>🎧 YouTube → 16kbps MP3</title></head>
+        <body style="background:#000;color:#0f0;text-align:center;font-family:system-ui;">
+        <h2>🎧 Convert YouTube → 16kbps MP3</h2>
+        <form action="/youtube2mp3" method="post">
+          <input type="text" name="url" placeholder="Paste YouTube URL" style="width:80%;padding:10px;border-radius:8px;border:none;">
+          <br><br>
+          <button type="submit" style="padding:10px 20px;border:none;border-radius:8px;background:#0f0;color:#000;font-weight:bold;">Convert & Play</button>
+        </form>
+        <br><a href="/" style="color:#0ff;">⬅ Home</a>
+        </body></html>
+        """
+
+    # POST: convert YouTube to MP3 16kbps mono
+    url = request.form.get("url", "").strip()
+    if not url:
+        return "Missing YouTube URL", 400
+
+    def generate():
+        cmd = [
+            "yt-dlp", "-f", "bestaudio", "-o", "-", url,
+            "-q", "--no-playlist"
+        ]
+        proc_ytdlp = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        ffmpeg_cmd = [
+            "ffmpeg", "-i", "pipe:0",
+            "-ac", "1", "-b:a", "16k",
+            "-f", "mp3", "pipe:1"
+        ]
+        proc_ffmpeg = subprocess.Popen(ffmpeg_cmd, stdin=proc_ytdlp.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        proc_ytdlp.stdout.close()
+
+        try:
+            while True:
+                chunk = proc_ffmpeg.stdout.read(1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            proc_ytdlp.terminate()
+            proc_ffmpeg.terminate()
+
+    return Response(generate(), mimetype="audio/mpeg", headers={"Content-Disposition": 'inline; filename="youtube.mp3"'})
+
 # -----------------------
 # Run Server
 # -----------------------
