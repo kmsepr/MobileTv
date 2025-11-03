@@ -1,55 +1,11 @@
-import os
 import time
 import threading
 import logging
-import subprocess
-import requests
-from flask import Flask, Response, render_template_string, abort, request, send_file
-
+from flask import Flask, Response, render_template_string, abort
+import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-
 app = Flask(__name__)
-
-MP3_DIR = "youtube2mp3"
-os.makedirs(MP3_DIR, exist_ok=True)
-
-@app.route("/")
-@app.route("/youtube2mp3")
-def list_mp3_files():
-    files = sorted(
-        [f for f in os.listdir(MP3_DIR) if f.endswith(".mp3")],
-        key=lambda x: os.path.getmtime(os.path.join(MP3_DIR, x)),
-        reverse=True
-    )
-
-    html = """
-    <html>
-    <head>
-        <title>YouTube2MP3 Files</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body { font-family: sans-serif; background: #111; color: #eee; padding: 10px; }
-            a { color: #4fc3f7; text-decoration: none; }
-            li { margin: 5px 0; padding: 5px; border-bottom: 1px solid #333; }
-        </style>
-    </head>
-    <body>
-        <h2>🎵 Saved MP3 Files</h2>
-        {% if files %}
-        <ul>
-        {% for f in files %}
-            <li><a href="/youtube2mp3/{{ f }}" target="_blank">{{ f }}</a></li>
-        {% endfor %}
-        </ul>
-        {% else %}
-        <p>No MP3 files yet.</p>
-        {% endif %}
-    </body>
-    </html>
-    """
-    return render_template_string(html, files=files)
 
 # -----------------------
 # TV Streams (direct m3u8)
@@ -475,88 +431,6 @@ def audio_only(channel):
         mimetype="audio/mpeg",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
-
-
-# -----------------------
-# YouTube to MP3 (16 kbps mono)
-# -----------------------
-# -----------------------
-# YouTube to MP3 (16 kbps mono)
-# -----------------------
-@app.route("/youtube2mp3", methods=["GET", "POST"])
-def youtube2mp3():
-    SAVE_DIR = "youtube2mp3"
-    os.makedirs(SAVE_DIR, exist_ok=True)
-
-    if request.method == "GET":
-        # List all saved MP3 files
-        files = sorted(
-            [f for f in os.listdir(SAVE_DIR) if f.endswith(".mp3")],
-            key=lambda x: os.path.getmtime(os.path.join(SAVE_DIR, x)),
-            reverse=True
-        )
-
-        html = """
-        <html>
-        <head>
-        <title>🎧 YouTube → 16kbps MP3</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body { background:#000; color:#0f0; font-family:system-ui; text-align:center; padding:10px; }
-            input { width:80%; padding:10px; border-radius:8px; border:none; }
-            button { padding:10px 20px; border:none; border-radius:8px; background:#0f0; color:#000; font-weight:bold; margin-top:10px; }
-            a { color:#0ff; text-decoration:none; }
-            ul { list-style:none; padding:0; margin-top:20px; text-align:left; display:inline-block; }
-            li { margin:6px 0; }
-        </style>
-        </head>
-        <body>
-        <h2>🎧 Convert YouTube → 16kbps MP3</h2>
-        <form action="/youtube2mp3" method="post">
-          <input type="text" name="url" placeholder="Paste YouTube URL">
-          <br>
-          <button type="submit">Convert & Play</button>
-        </form>
-        <br><a href="/">⬅ Home</a>
-
-        <h3>Saved MP3 Files</h3>
-        {% if files %}
-        <ul>
-        {% for f in files %}
-          <li><a href="/youtube2mp3/{{ f }}" target="_blank">{{ f }}</a></li>
-        {% endfor %}
-        </ul>
-        {% else %}
-        <p>No MP3 files yet.</p>
-        {% endif %}
-        </body></html>
-        """
-        return render_template_string(html, files=files)
-
-    # POST: convert YouTube to MP3 (and save)
-    url = request.form.get("url", "").strip()
-    if not url:
-        return "Missing YouTube URL", 400
-
-    # Generate filename
-    ts = int(time.time())
-    filename = os.path.join(SAVE_DIR, f"yt_{ts}.mp3")
-
-    cmd = [
-        "yt-dlp", "-f", "bestaudio", "-o", "-", url,
-        "-q", "--no-playlist"
-    ]
-    proc_ytdlp = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
-    ffmpeg_cmd = [
-        "ffmpeg", "-i", "pipe:0",
-        "-ac", "1", "-b:a", "16k",
-        "-f", "mp3", filename
-    ]
-    subprocess.run(ffmpeg_cmd, stdin=proc_ytdlp.stdout)
-    proc_ytdlp.stdout.close()
-
-    return f'<html><body style="background:#000;color:#0f0;text-align:center;"><h3>✅ Saved as <a href="/youtube2mp3/{os.path.basename(filename)}">{os.path.basename(filename)}</a></h3><a href="/youtube2mp3" style="color:#0ff;">⬅ Back</a></body></html>'
 
 # -----------------------
 # Run Server
