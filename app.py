@@ -4,7 +4,7 @@ import logging
 import subprocess
 import os
 import requests
-from flask import Flask, Response, render_template_string, abort
+from flask import Flask, Response, render_template_string, abort, jsonify
 
 # =========================================================
 # 🔧 Basic setup
@@ -22,10 +22,6 @@ TV_STREAMS = {
     "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
     "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
-    "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
-    "radio_jornal": "https://player-ne10-radiojornal-app.stream.uol.com.br/live/radiojornalrecifeapp.m3u8",
-    "star_sports1": "http://87.255.35.150:18828/",
-    "star_sports2": "http://87.255.35.150:18804/",
 }
 
 # =========================================================
@@ -36,62 +32,52 @@ YOUTUBE_STREAMS = {
     "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
     "asianet_news": "https://www.youtube.com/@asianetnews/live",
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-    "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
-    "suprabhatam": "https://www.youtube.com/@suprabhaatham_online/live",
-    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
-    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
-    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
+    "suprabhaatham": "https://www.youtube.com/@suprabhaatham_online/live",
 }
 
 # =========================================================
 # 🖼 Channel Logos
 # =========================================================
 CHANNEL_LOGOS = {
-    "star_sports1": "https://imgur.com/5En7pOI.png",
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
     "victers_tv": "https://i.imgur.com/kj4OEsb.png",
-    "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
     "france_24": "https://upload.wikimedia.org/wikipedia/commons/c/c1/France_24_logo_%282013%29.svg",
-    "aqsa_tv": "https://i.imgur.com/Z2rfrQ8.png",
     "mazhavil_manorama": "https://i.imgur.com/fjgzW20.png",
     "dd_malayalam": "https://i.imgur.com/ywm2dTl.png",
     "dd_sports": "https://i.imgur.com/J2Ky5OO.png",
-    "mult": "https://i.imgur.com/xi351Fx.png",
-    "yemen_today": "https://i.imgur.com/8TzcJu5.png",
-    "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
-    "al_sahat": "https://i.imgur.com/UVndAta.png",
     **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
 }
 
-# =========================================================
-# 🧠 Globals
-# =========================================================
-CACHE = {}
-LIVE_STATUS = {}
+CACHE, LIVE_STATUS = {}, {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # =========================================================
-# 🌍 IPTV-ORG Categories
+# 🌍 IPTV ORG Data
 # =========================================================
-IPTV_CATEGORIES = []
-CATEGORIES_URL = "https://iptv-org.github.io/api/categories.json"
+COUNTRIES_URL = "https://iptv-org.github.io/api/countries.json"
+CHANNELS_URL = "https://iptv-org.github.io/api/channels.json"
+IPTV_COUNTRIES, IPTV_CHANNELS = [], {}
 
-def fetch_iptv_categories():
-    global IPTV_CATEGORIES
+def fetch_iptv_data():
+    global IPTV_COUNTRIES, IPTV_CHANNELS
     try:
-        r = requests.get(CATEGORIES_URL, timeout=10)
-        r.raise_for_status()
-        IPTV_CATEGORIES = r.json()
-        logging.info(f"✅ Loaded {len(IPTV_CATEGORIES)} IPTV categories")
+        c = requests.get(COUNTRIES_URL, timeout=10).json()
+        ch = requests.get(CHANNELS_URL, timeout=60).json()
+        IPTV_COUNTRIES = sorted(c, key=lambda x: x["name"])
+        IPTV_CHANNELS = {}
+        for x in ch:
+            code = x.get("country")
+            if not code or not x.get("url"):
+                continue
+            IPTV_CHANNELS.setdefault(code, []).append(x)
+        logging.info(f"✅ IPTV loaded: {len(IPTV_COUNTRIES)} countries, {len(ch)} channels")
     except Exception as e:
-        logging.error(f"⚠️ Failed to load IPTV categories: {e}")
-        IPTV_CATEGORIES = []
+        logging.error(f"⚠️ IPTV fetch failed: {e}")
 
-fetch_iptv_categories()
+threading.Thread(target=fetch_iptv_data, daemon=True).start()
 
 # =========================================================
-# 🧩 YouTube HLS Extraction
+# 🧩 YouTube live HLS extraction
 # =========================================================
 def get_youtube_live_url(youtube_url: str):
     try:
@@ -99,224 +85,168 @@ def get_youtube_live_url(youtube_url: str):
         if os.path.exists(COOKIES_FILE):
             cmd.insert(1, "--cookies")
             cmd.insert(2, COOKIES_FILE)
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
     except Exception:
         pass
     return None
 
-# =========================================================
-# ♻ Background refresher
-# =========================================================
-def refresh_stream_urls():
+def refresh_streams():
     while True:
-        logging.info("🔄 Refreshing YouTube live URLs...")
-        for name, url in YOUTUBE_STREAMS.items():
-            direct_url = get_youtube_live_url(url)
-            if direct_url:
-                CACHE[name] = direct_url
-                LIVE_STATUS[name] = True
+        logging.info("🔁 Refreshing YouTube URLs...")
+        for n, u in YOUTUBE_STREAMS.items():
+            url = get_youtube_live_url(u)
+            if url:
+                CACHE[n] = url
+                LIVE_STATUS[n] = True
             else:
-                LIVE_STATUS[name] = False
-        time.sleep(60)
+                LIVE_STATUS[n] = False
+        time.sleep(180)
 
-threading.Thread(target=refresh_stream_urls, daemon=True).start()
+threading.Thread(target=refresh_streams, daemon=True).start()
 
 # =========================================================
-# 🏠 Home
+# 🏠 Main Page
 # =========================================================
 @app.route("/")
-def home():
-    tv_channels = list(TV_STREAMS.keys())
-    live_youtube = [n for n, live in LIVE_STATUS.items() if live]
-
+def index():
     html = """
-<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📺 Live TV & YouTube</title>
+<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📡 IPTV & YouTube Player</title>
 <style>
-body{font-family:system-ui;background:#0e0e0e;color:#fff;margin:0}
-h1{text-align:center;margin:20px 0 10px}
-.tabs{display:flex;justify-content:center;background:#111;padding:10px}
-.tab{padding:10px 20px;cursor:pointer;border-radius:10px;background:#222;color:#0ff;margin:0 6px;font-weight:600}
-.tab.active{background:#0ff;color:#000;transform:scale(1.05)}
-.search-container{text-align:center;margin:12px 0}
-.search-container input{width:80%;max-width:400px;padding:10px 12px;border-radius:8px;border:none;outline:none;background:#1b1b1b;color:#0ff;text-align:center}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;padding:20px;max-width:1200px;margin:0 auto}
-.card{background:#1b1b1b;border-radius:18px;text-align:center;overflow:hidden;transition:all .3s;box-shadow:0 3px 8px rgba(0,255,255,.1);position:relative}
-.card:hover{transform:scale(1.06);box-shadow:0 5px 15px rgba(0,255,255,.4)}
-.card img{width:100%;height:100px;object-fit:contain;background:#111;padding:10px;border-bottom:1px solid #222}
-.card span{display:block;font-size:.95rem;margin-top:8px;font-weight:600}
-.links a{color:#0ff;margin:0 6px;text-decoration:none;font-weight:600}
-.live-badge{position:absolute;top:8px;right:8px;background:#ff1744;color:white;font-size:.75rem;padding:3px 6px;border-radius:6px}
+body{font-family:sans-serif;background:#000;color:#fff;margin:0}
+.tabs{display:flex;justify-content:center;background:#111}
+.tab{padding:10px 16px;margin:3px;cursor:pointer;border-radius:8px;background:#222;color:#0ff}
+.tab.active{background:#0ff;color:#000}
+.grid{display:flex;flex-wrap:wrap;justify-content:center;padding:10px}
+.card{width:150px;background:#111;margin:6px;padding:6px;border-radius:10px;text-align:center}
+.card img{width:100%;height:90px;object-fit:contain;background:#fff;border-radius:6px}
+button{background:#0ff;color:#000;border:none;border-radius:8px;padding:5px 10px;margin-top:6px;cursor:pointer}
 .hidden{display:none}
 </style>
 <script>
-function showTab(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-document.querySelectorAll('.grid').forEach(g=>g.classList.add('hidden'));
-document.getElementById(tab).classList.remove('hidden');
-document.getElementById('tab_'+tab).classList.add('active');
-document.getElementById("search").value="";filterChannels("");}
-function filterChannels(v){const term=v.toLowerCase();
-document.querySelectorAll('.card').forEach(c=>{const n=c.getAttribute('data-name');c.style.display=(!term||n.includes(term))?'':'none';});}
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.grid').forEach(g=>g.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  document.getElementById('tab_'+id).classList.add('active');
+}
+async function loadCountry(code){
+  showTab('channels');
+  const r=await fetch('/api/country/'+code);
+  const d=await r.json();
+  const g=document.getElementById('channels');
+  g.innerHTML='<h3>'+d.country+'</h3>';
+  d.channels.forEach(c=>{
+    g.innerHTML+=`
+    <div class='card'>
+      <img src='${c.logo||"https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg"}'>
+      <div>${c.name}</div>
+      <button onclick="window.open('/watch_url?url=${encodeURIComponent(c.url)}')">▶ Play</button>
+    </div>`;});
+}
 window.onload=()=>showTab('tv');
 </script></head>
 <body>
-<h1>📡 Live TV & YouTube Streams</h1>
+<h2 style="text-align:center">📡 Live IPTV & YouTube</h2>
 <div class="tabs">
-  <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV</div>
+  <div class="tab active" id="tab_tv" onclick="showTab('tv')">⭐Favourites</div>
   <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube</div>
-  <div class="tab" id="tab_categories" onclick="showTab('categories')">🌍 IPTV Categories</div>
+  <div class="tab" id="tab_country" onclick="showTab('country')">🌍 IPTV</div>
 </div>
-<div class="search-container"><input type="text" id="search" onkeyup="filterChannels(this.value)" placeholder="🔍 Search..."></div>
 
 <div id="tv" class="grid">
-{% for key in tv_channels %}
-  <div class="card" data-name="{{ key.replace('_',' ').lower() }}">
-    <img src="{{ logos.get(key) }}" alt="{{ key }}">
-    <span>{{ key.replace('_',' ').title() }}</span>
-    <div class="links">
-      <a href="/watch/{{ key }}">▶ Watch</a>
-      <a href="/audio/{{ key }}">🎵 Audio</a>
-    </div>
+{% for k,v in tv.items() %}
+  <div class="card">
+    <img src="{{ logos.get(k) }}">
+    <div>{{ k.replace('_',' ').title() }}</div>
+    <button onclick="window.open('/watch/{{ k }}')">▶ Watch</button>
   </div>
 {% endfor %}
 </div>
 
 <div id="youtube" class="grid hidden">
-{% for key in youtube_channels %}
-  <div class="card" data-name="{{ key.replace('_',' ').lower() }}">
-    <div class="live-badge">LIVE 🔴</div>
-    <img src="{{ logos.get(key) }}" alt="{{ key }}">
-    <span>{{ key.replace('_',' ').title() }}</span>
-    <div class="links">
-      <a href="/watch/{{ key }}">▶ Watch</a>
-      <a href="/audio/{{ key }}">🎵 Audio</a>
-    </div>
+{% for k in youtube %}
+  <div class="card">
+    <img src="{{ logos.get(k) }}">
+    <div>{{ k.replace('_',' ').title() }}</div>
+    <button onclick="window.open('/watch/{{ k }}')">▶ Watch</button>
   </div>
 {% endfor %}
 </div>
 
-<div id="categories" class="grid hidden">
-{% for cat in iptv_categories %}
-  <div class="card" data-name="{{ cat.name.lower() }}">
-    <img src="https://iptv-org.github.io/iptv/categories/{{ cat.id }}.png"
-         onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg'">
-    <span>{{ cat.name }}</span>
-    <div class="links">
-      <a href="https://iptv-org.github.io/iptv/categories/{{ cat.id }}.m3u" target="_blank">📜 View M3U</a>
-    </div>
+<div id="country" class="grid hidden">
+{% for c in countries %}
+  <div class="card" onclick="loadCountry('{{ c['code'] }}')">
+    <img src="https://flagcdn.com/w80/{{ c['code']|lower }}.png">
+    <div>{{ c['name'] }}</div>
   </div>
 {% endfor %}
 </div>
+
+<div id="channels" class="grid hidden"></div>
+
 </body></html>
 """
-    return render_template_string(
-        html,
-        tv_channels=tv_channels,
-        youtube_channels=live_youtube,
-        logos=CHANNEL_LOGOS,
-        iptv_categories=IPTV_CATEGORIES
-    )
+    return render_template_string(html, tv=TV_STREAMS, youtube=[k for k,v in LIVE_STATUS.items() if v], logos=CHANNEL_LOGOS, countries=IPTV_COUNTRIES)
 
 # =========================================================
-# ▶ Watch route
+# ▶ API: IPTV by country
 # =========================================================
-@app.route("/watch/<channel>")
-def watch(channel):
-    tv_channels = list(TV_STREAMS.keys())
-    live_youtube = [n for n, live in LIVE_STATUS.items() if live]
-    all_channels = tv_channels + live_youtube
-    if channel not in all_channels:
-        abort(404)
+@app.route("/api/country/<code>")
+def country_api(code):
+    chs = IPTV_CHANNELS.get(code.upper(), [])
+    return jsonify({
+        "country": next((c["name"] for c in IPTV_COUNTRIES if c["code"] == code.upper()), code),
+        "channels": [{"name": c["name"], "logo": c.get("logo"), "url": c["url"]} for c in chs][:100]
+    })
 
-    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
-    idx = all_channels.index(channel)
-    prev_ch = all_channels[(idx - 1) % len(all_channels)]
-    next_ch = all_channels[(idx + 1) % len(all_channels)]
-
-    html = f"""
-<html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{channel.title()}</title>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<style>
-body{{background:#000;color:#fff;text-align:center;margin:0;padding:10px}}
-video{{width:95%;max-width:720px;height:auto;background:#000;border:1px solid #333}}
-a{{color:#0f0;text-decoration:none;margin:10px;display:inline-block}}
-</style>
+# =========================================================
+# ▶ Watch route for all URLs
+# =========================================================
+@app.route("/watch_url")
+def watch_url():
+    url = request.args.get("url")
+    if not url:
+        abort(400)
+    return f"""
+<html><head><script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script></head>
+<body style='background:black;text-align:center'>
+<video id='v' controls autoplay style='width:95%;max-width:720px'></video>
 <script>
-document.addEventListener("DOMContentLoaded",()=>{{
- const v=document.getElementById("player");const src="{video_url}";
- if(v.canPlayType("application/vnd.apple.mpegurl"))v.src=src;
- else if(Hls.isSupported()){{const hls=new Hls({{lowLatencyMode:true}});hls.loadSource(src);hls.attachMedia(v);}}
-}});
-document.addEventListener("keydown",e=>{{
- const v=document.getElementById("player");
- if(e.key==="4")location="/watch/{prev_ch}";
- if(e.key==="6")location="/watch/{next_ch}";
- if(e.key==="0")location="/";
- if(e.key==="5"&&v){{v.paused?v.play():v.pause();}}
- if(e.key==="9")location.reload();
-}});
-</script></head>
-<body>
-<h2>{channel.replace('_',' ').title()}</h2>
-<video id="player" controls autoplay playsinline></video>
-<div style="margin-top:15px">
-  <a href="/">⬅ Home</a>
-  <a href="/watch/{prev_ch}">⏮ Prev</a>
-  <a href="/watch/{next_ch}">⏭ Next</a>
-  <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
-</div>
+const v=document.getElementById('v');const u="{url}";
+if(v.canPlayType('application/vnd.apple.mpegurl'))v.src=u;
+else if(Hls.isSupported()){{const h=new Hls();h.loadSource(u);h.attachMedia(v);}}
+</script>
 </body></html>"""
-    return html
 
-# =========================================================
-# 🔁 Proxy for YouTube HLS
-# =========================================================
-@app.route("/stream/<channel>")
-def stream(channel):
-    url = CACHE.get(channel)
+@app.route("/watch/<ch>")
+def watch_channel(ch):
+    url = TV_STREAMS.get(ch) or CACHE.get(ch)
     if not url:
-        return "Channel not ready", 503
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        return f"Error fetching stream: {e}", 502
-    return Response(r.content, content_type=r.headers.get("Content-Type", "application/vnd.apple.mpegurl"))
+        return "Not available", 503
+    return watch_url.__wrapped__({"url": url})  # reuse logic
 
 # =========================================================
-# 🎧 Audio-only route (browser-playable)
+# 🎧 Audio proxy
 # =========================================================
-@app.route("/audio/<channel>")
-def audio_only(channel):
-    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+@app.route("/audio/<ch>")
+def audio_proxy(ch):
+    url = TV_STREAMS.get(ch) or CACHE.get(ch)
     if not url:
-        return "Channel not ready", 503
-
+        abort(404)
     def generate():
-        cmd = [
-            "ffmpeg", "-loglevel", "quiet", "-i", url,
-            "-vn", "-ac", "1", "-ar", "44100",
-            "-b:a", "48k", "-f", "mp3", "pipe:1"
-        ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        try:
-            for chunk in iter(lambda: proc.stdout.read(1024), b""):
-                yield chunk
-        finally:
-            proc.terminate()
-
+        cmd = ["ffmpeg", "-loglevel", "quiet", "-i", url, "-vn", "-ac", "1", "-ar", "44100", "-b:a", "40k", "-f", "mp3", "pipe:1"]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        for chunk in iter(lambda: p.stdout.read(1024), b""):
+            yield chunk
+        p.terminate()
     return Response(generate(), mimetype="audio/mpeg")
 
 # =========================================================
 # 🚀 Run
 # =========================================================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    app.run(host="0.0.0.0", port=8000)
