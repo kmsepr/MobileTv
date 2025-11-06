@@ -26,11 +26,11 @@ TV_STREAMS = {
 "star_sports1": "http://87.255.35.150:18828/",
 
 
-star_sports2": "http://116.90.120.149:8000/play/a0ba/index.m3u8,
+"star_sports2": "http://116.90.120.149:8000/play/a0ba/index.m3u8,
 
-star_sports3": "http://116.90.120.149:8000/play/a0bv/index.m3u8,
+"star_sports3": "http://116.90.120.149:8000/play/a0bv/index.m3u8,
 
-star_sports4": "http://116.90.120.149:8000/play/a0cs/index.m3u8",
+"star_sports4": "http://116.90.120.149:8000/play/a0cs/index.m3u8",
 
 star_sports5": "http://87.255.35.150:18804/",
 
