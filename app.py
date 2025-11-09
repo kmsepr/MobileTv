@@ -44,7 +44,7 @@ YOUTUBE_STREAMS = {
     
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     
-    "kas_ranker": "https://www.youtube.com/@kasranker/live",
+    "kas_ranker": "https://www.youtube.com/@kasrankerofficial/live",
 }
 
 # -----------------------
