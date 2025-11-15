@@ -30,6 +30,8 @@ TV_STREAMS = {
 # -----------------------
 YOUTUBE_STREAMS = {
 
+"samastha_online": "https://www.youtube.com/live/yzLl4j2UeIY",
+
 "asianet_news": "https://www.youtube.com/@asianetnews/live",
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
