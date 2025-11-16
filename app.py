@@ -287,41 +287,46 @@ def audio_only(channel):
 
     def generate():
         cmd = [
-            "ffmpeg", "-i", url,
+            "ffmpeg",
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "10",
+            "-user_agent", "Mozilla/5.0",
+            "-i", url,
             "-vn",
             "-ac", "1",
             "-b:a", "40k",
             "-f", "mp3",
-            "pipe:1"
+            "-"
         ]
 
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             bufsize=10**7
         )
 
-        # ---- WAIT FOR AUDIO READINESS (IMPORTANT) ----
+        # Wait for audio to arrive
         import time
         start = time.time()
         first_bytes = None
 
-        while time.time() - start < 4:   # wait max 4s
-            if proc.stdout.peek(256):    # audio arrived
-                first_bytes = proc.stdout.read(1024)
+        while time.time() - start < 4:
+            chunk = proc.stdout.read(1024)
+            if chunk:
+                first_bytes = chunk
                 break
             time.sleep(0.1)
 
-        # still no audio? fail safely
+        # if audio did not start
         if not first_bytes:
             proc.kill()
             return
 
-        # send first chunk
         yield first_bytes
 
-        # NOW continue streaming normally
+        # Continue normal streaming
         try:
             while True:
                 data = proc.stdout.read(1024)
