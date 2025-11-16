@@ -16,7 +16,7 @@ TV_STREAMS = {
     "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
     "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
     "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
-   
+    "bloomberg_tv": "https://bloomberg-bloomberg-3-br.samsung.wurl.tv/manifest/playlist.m3u8",
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
     "aqsa_tv": "http://167.172.161.13/hls/feedspare/6udfi7v8a3eof6nlps6e9ovfrs65c7l7.m3u8",
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
@@ -29,26 +29,26 @@ TV_STREAMS = {
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
-
-"samastha_online": "https://www.youtube.com/live/yzLl4j2UeIY",
-
-"skicr": "https://www.youtube.com/@SKICRTV/live",
-
-"asianet_news": "https://www.youtube.com/@asianetnews/live",
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    
+    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
+    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
+    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
     "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
     "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
-    
+    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
     "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
-    
+    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
+    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
+    "entri_app": "https://www.youtube.com/@entriapp/live",
+    "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    
-    "kas_ranker": "https://www.youtube.com/@kasrankerofficial/live",
+    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
+    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
 # -----------------------
@@ -155,7 +155,7 @@ window.onload=()=>showTab('tv');
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span><br>
     <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-    <a href="/stream/{{ key }}" style="color:#ff0;">🎵 Audio</a>
+    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
 </div>
@@ -166,7 +166,7 @@ window.onload=()=>showTab('tv');
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span><br>
     <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-    <a href="/stream/{{ key }}" style="color:#ff0;">🎵 Audio</a>
+    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
 </div>
@@ -244,39 +244,20 @@ document.addEventListener("keydown", function(e) {{
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
-    # FIRST try YouTube cached streams
     url = CACHE.get(channel)
-
-    # If not in CACHE, try TV streams
-    if not url:
-        url = TV_STREAMS.get(channel)
-
     if not url:
         return "Channel not ready", 503
 
-    def generate():
-        cmd = [
-            "ffmpeg", "-i", url,
-            "-vn",               # no video
-            "-ac", "1",          # mono
-            "-b:a", "40k",       # 40 kbps
-            "-f", "mp3",
-            "pipe:1"
-        ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        try:
-            while True:
-                data = proc.stdout.read(1024)
-                if not data:
-                    break
-                yield data
-        finally:
-            proc.terminate()
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        return f"Error fetching stream: {e}", 502
 
-    return Response(
-        generate(),
-        mimetype="audio/mpeg"   # MP3 inline streaming
-    )
+    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
+    return Response(r.content, content_type=content_type)
+
 @app.route("/audio/<channel>")
 def audio_only(channel):
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
@@ -287,46 +268,14 @@ def audio_only(channel):
 
     def generate():
         cmd = [
-            "ffmpeg",
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_delay_max", "10",
-            "-user_agent", "Mozilla/5.0",
-            "-i", url,
-            "-vn",
-            "-ac", "1",
-            "-b:a", "40k",
+            "ffmpeg", "-i", url,
+            "-vn",               # no video
+            "-ac", "1",          # mono
+            "-b:a", "40k",       # 40kbps
             "-f", "mp3",
-            "-"
+            "pipe:1"
         ]
-
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            bufsize=10**7
-        )
-
-        # Wait for audio to arrive
-        import time
-        start = time.time()
-        first_bytes = None
-
-        while time.time() - start < 4:
-            chunk = proc.stdout.read(1024)
-            if chunk:
-                first_bytes = chunk
-                break
-            time.sleep(0.1)
-
-        # if audio did not start
-        if not first_bytes:
-            proc.kill()
-            return
-
-        yield first_bytes
-
-        # Continue normal streaming
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
                 data = proc.stdout.read(1024)
