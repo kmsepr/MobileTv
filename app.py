@@ -242,20 +242,39 @@ document.addEventListener("keydown", function(e) {{
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
+    # FIRST try YouTube cached streams
     url = CACHE.get(channel)
+
+    # If not in CACHE, try TV streams
+    if not url:
+        url = TV_STREAMS.get(channel)
+
     if not url:
         return "Channel not ready", 503
 
-    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        return f"Error fetching stream: {e}", 502
+    def generate():
+        cmd = [
+            "ffmpeg", "-i", url,
+            "-vn",               # no video
+            "-ac", "1",          # mono
+            "-b:a", "40k",       # 40 kbps
+            "-f", "mp3",
+            "pipe:1"
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
 
-    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
-    return Response(r.content, content_type=content_type)
-
+    return Response(
+        generate(),
+        mimetype="audio/mpeg"   # MP3 inline streaming
+    )
 @app.route("/audio/<channel>")
 def audio_only(channel):
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
