@@ -1,39 +1,72 @@
-FROM python:3.11-slim
+FROM debian:stable-slim AS ffmpeg-build
 
 # -----------------------------
-# Set working directory
+# Install build dependencies
 # -----------------------------
-WORKDIR /app
-
-# -----------------------------
-# Install system dependencies
-# -----------------------------
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ffmpeg \
-        curl \
-        ca-certificates \
-        git \
-        build-essential && \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf automake build-essential cmake libtool pkg-config \
+    yasm nasm \
+    libx264-dev libx265-dev libnuma-dev \
+    libvpx-dev libfdk-aac-dev libmp3lame-dev libopus-dev \
+    git curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
+WORKDIR /tmp/ffmpeg
+
 # -----------------------------
-# Upgrade pip and install Python dependencies
+# Get FFmpeg source
 # -----------------------------
+RUN git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git .
+
+# -----------------------------
+# Configure + Compile FFmpeg
+# -----------------------------
+RUN ./configure \
+    --prefix=/usr/local \
+    --pkg-config-flags="--static" \
+    --extra-cflags="-I/usr/local/include" \
+    --extra-ldflags="-L/usr/local/lib" \
+    --extra-libs="-lpthread -lm" \
+    --bindir=/usr/local/bin \
+    --enable-gpl \
+    --enable-nonfree \
+    --enable-libx264 \
+    --enable-libx265 \
+    --enable-libvpx \
+    --enable-libfdk-aac \
+    --enable-libmp3lame \
+    --enable-libopus \
+    --enable-static \
+    --disable-debug \
+    --disable-doc \
+    --disable-ffplay && \
+    make -j$(nproc) && make install
+
+
+# ===============================================================
+# FINAL IMAGE: Python + Flask + yt-dlp + STATIC FFmpeg
+# ===============================================================
+
+FROM python:3.11-slim AS final
+
+WORKDIR /app
+
+# Copy FFmpeg from build stage
+COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
+COPY --from=ffmpeg-build /usr/local/bin/ffprobe /usr/local/bin/ffprobe
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir flask requests yt-dlp gunicorn
 
-# -----------------------------
-# Copy application code
-# -----------------------------
+# Copy the App
 COPY . /app
 
-# -----------------------------
-# Expose port
-# -----------------------------
 EXPOSE 8000
 
-# -----------------------------
-# Start Gunicorn with 2 workers and 2 threads
-# -----------------------------
 CMD ["gunicorn", "-w", "2", "--threads", "2", "-b", "0.0.0.0:8000", "app:app"]
