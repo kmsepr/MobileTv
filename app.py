@@ -1,9 +1,8 @@
 import time
 import threading
 import logging
-from flask import Flask, Response, render_template_string, abort, stream_with_context, request
+from flask import Flask, Response, render_template_string, abort
 import subprocess, os, requests
-import signal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
@@ -76,7 +75,7 @@ LIVE_STATUS = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube HLS URL (unchanged)
+# Extract YouTube HLS URL
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
     try:
@@ -92,7 +91,7 @@ def get_youtube_live_url(youtube_url: str):
     return None
 
 # -----------------------
-# Background refresh thread (unchanged)
+# Background refresh thread
 # -----------------------
 def refresh_stream_urls():
     while True:
@@ -109,7 +108,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Home Page (with visible tabs) - unchanged
+# Home Page (with visible tabs)
 # -----------------------
 @app.route("/")
 def home():
@@ -184,27 +183,39 @@ def watch(channel):
     tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
-
     if channel not in all_channels:
         abort(404)
 
-    video_url = f"/stream240/{channel}"
+    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
 
-    # NOTE: we now point the <video> directly at /stream240 which serves fragmented MP4
     html = f"""
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{channel.replace('_',' ').title()}</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <style>
 body {{ background:#000; color:#fff; text-align:center; margin:0; padding:10px; }}
 video {{ width:95%; max-width:720px; height:auto; background:#000; border:1px solid #333; }}
 a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-size:18px; }}
 </style>
 <script>
+document.addEventListener("DOMContentLoaded", function() {{
+  const video = document.getElementById("player");
+  const src = "{video_url}";
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+    video.src = src;
+  }} else if (Hls.isSupported()) {{
+    const hls = new Hls({{lowLatencyMode:true}});
+    hls.loadSource(src);
+    hls.attachMedia(video);
+  }} else {{
+    alert("⚠️ Browser cannot play HLS stream.");
+  }}
+}});
 document.addEventListener("keydown", function(e) {{
   const v=document.getElementById("player");
   if(e.key==="4")window.location.href="/watch/{prev_channel}";
@@ -213,20 +224,11 @@ document.addEventListener("keydown", function(e) {{
   if(e.key==="5"&&v){{v.paused?v.play():v.pause();}}
   if(e.key==="9")window.location.reload();
 }});
-window.addEventListener('load', function() {{
-  const video = document.getElementById('player');
-  // Use direct fMP4 source
-  video.src = "{video_url}";
-  video.setAttribute('playsinline', '');
-  video.autoplay = true;
-  // Attempt to play on load
-  video.play().catch(()=>{{/* autoplay might be blocked until user gesture */}});
-}});
 </script>
 </head>
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
-<video id="player" controls></video>
+<video id="player" controls autoplay playsinline></video>
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
   <a href="/watch/{prev_channel}">⏮ Prev</a>
@@ -238,7 +240,7 @@ window.addEventListener('load', function() {{
     return html
 
 # -----------------------
-# Proxy Stream (m3u8 passthrough) - unchanged
+# Proxy Stream
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
@@ -256,9 +258,6 @@ def stream(channel):
     content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
     return Response(r.content, content_type=content_type)
 
-# -----------------------
-# Audio-only (unchanged)
-# -----------------------
 @app.route("/audio/<channel>")
 def audio_only(channel):
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
@@ -279,7 +278,7 @@ def audio_only(channel):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
-                data = proc.stdout.read(4096)
+                data = proc.stdout.read(1024)
                 if not data:
                     break
                 yield data
@@ -293,113 +292,7 @@ def audio_only(channel):
     )
 
 # -----------------------
-# 240p Transcoding Stream (FIXED)
-# -----------------------
-@app.route("/stream240/<channel>")
-def stream240(channel):
-    url = TV_STREAMS.get(channel) or CACHE.get(channel)
-    if not url:
-        return "Channel not ready", 503
-
-    # Build FFmpeg command optimized for low-latency fragmented MP4 (fMP4)
-    def generate():
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel", "info",
-
-            # input
-            "-re",               # read input at native rate (helps with some live sources)
-            "-i", url,
-
-            # video: scale and encode
-            "-vf", "scale=426:240:flags=bicubic",
-            "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-tune", "zerolatency",
-            "-profile:v", "baseline",
-            "-level", "3.0",
-            "-b:v", "300k",
-            "-maxrate", "300k",
-            "-bufsize", "600k",
-
-            # audio: aac (widely supported)
-            "-c:a", "aac",
-            "-ac", "1",
-            "-ar", "44100",
-            "-b:a", "48k",
-
-            # muxer: fragmented mp4 for streaming over HTTP
-            "-movflags", "frag_keyframe+empty_moov+default_base_moof+faststart",
-            "-fflags", "nobuffer",
-            "-flags", "low_delay",
-            "-max_muxing_queue_size", "9999",
-
-            # format and pipe
-            "-f", "mp4",
-            "pipe:1"
-        ]
-
-        logging.info("Starting ffmpeg: " + " ".join(ffmpeg_cmd))
-        proc = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            bufsize=0,
-            preexec_fn=os.setsid  # allow killing the whole process group
-        )
-
-        # start thread to read and log stderr (non-blocking)
-        def stderr_reader():
-            for raw in proc.stderr:
-                try:
-                    line = raw.decode(errors="ignore").rstrip()
-                except Exception:
-                    line = str(raw)
-                logging.info("[FFMPEG] " + line)
-        t = threading.Thread(target=stderr_reader, daemon=True)
-        t.start()
-
-        try:
-            # read and yield in reasonably sized chunks (32KB)
-            while True:
-                chunk = proc.stdout.read(32 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            # try to terminate ffmpeg gracefully, then force kill if needed
-            try:
-                logging.info("Terminating ffmpeg (pid=%s)", proc.pid)
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                # give it a moment
-                proc.wait(timeout=2)
-            except Exception:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except Exception:
-                    pass
-
-    # Use stream_with_context so Flask closes generator on client disconnect
-    headers = {
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        # Transfer-Encoding often set by WSGI server; explicit doesn't hurt here
-        "Transfer-Encoding": "chunked",
-    }
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="video/mp4",
-        headers=headers,
-        direct_passthrough=True
-    )
-
-# -----------------------
 # Run Server
 # -----------------------
 if __name__ == "__main__":
-    # reduce Werkzeug log spam
-    logging.getLogger("werkzeug").setLevel(logging.INFO)
     app.run(host="0.0.0.0", port=8000, debug=False)
