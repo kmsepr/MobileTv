@@ -304,8 +304,9 @@ def stream240(channel):
     def generate():
         cmd = [
             "ffmpeg",
+            "-loglevel", "debug",
             "-i", url,
-            "-vf", "scale=426:240",          # convert to 240p
+            "-vf", "scale=426:240",
             "-preset", "veryfast",
             "-tune", "zerolatency",
             "-c:v", "libx264",
@@ -313,23 +314,32 @@ def stream240(channel):
             "-b:v", "250k",
             "-b:a", "48k",
             "-ac", "1",
-            "-f", "hls",
-            "-hls_time", "3",
-            "-hls_list_size", "5",
-            "-hls_flags", "delete_segments",
+            "-f", "mp4",
+            "-movflags", "frag_keyframe+empty_moov+default_base_moof",
             "pipe:1"
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0
+        )
+
+        # LIVE FFmpeg log for debugging
+        for line in proc.stderr:
+            logging.info(f"[FFMPEG] {line.decode(errors='ignore').strip()}")
+
         try:
             while True:
-                data = proc.stdout.read(1024)
+                data = proc.stdout.read(4096)
                 if not data:
                     break
                 yield data
         finally:
-            proc.terminate()
+            proc.kill()
 
-    return Response(generate(), mimetype="application/vnd.apple.mpegurl")
+    return Response(generate(), mimetype="video/mp4")
 
 # -----------------------
 # Run Server
