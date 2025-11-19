@@ -306,36 +306,53 @@ def stream240(channel):
             "ffmpeg",
             "-loglevel", "debug",
             "-i", url,
-            "-vf", "scale=426:240",
+
+            # VIDEO
+            "-vf", "scale=426:240:flags=bicubic",
+            "-c:v", "libx264",
             "-preset", "veryfast",
             "-tune", "zerolatency",
-            "-c:v", "libx264",
+            "-profile:v", "baseline",
+            "-level", "3.0",
+            "-b:v", "300k",
+            "-maxrate", "300k",
+            "-bufsize", "600k",
+
+            # AUDIO
             "-c:a", "aac",
-            "-b:v", "250k",
-            "-b:a", "48k",
             "-ac", "1",
+            "-ar", "44100",
+            "-b:a", "48k",
+
+            # STREAMING MP4 FORMAT
+            "-movflags", "frag_keyframe+empty_moov+default_base_moof+faststart",
             "-f", "mp4",
-            "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+
             "pipe:1"
         ]
 
+        # NON-BLOCKING PIPE (stderr separate thread)
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            bufsize=0
+            bufsize=4096
         )
 
-        # LIVE FFmpeg log for debugging
-        for line in proc.stderr:
-            logging.info(f"[FFMPEG] {line.decode(errors='ignore').strip()}")
+        # ---- LOG FFmpeg in background ----
+        def log_reader():
+            for line in proc.stderr:
+                logging.info("[FFMPEG] " + line.decode(errors="ignore").rstrip())
 
+        threading.Thread(target=log_reader, daemon=True).start()
+
+        # ---- STREAM THE VIDEO ----
         try:
             while True:
-                data = proc.stdout.read(4096)
-                if not data:
+                chunk = proc.stdout.read(4096)
+                if not chunk:
                     break
-                yield data
+                yield chunk
         finally:
             proc.kill()
 
