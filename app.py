@@ -30,7 +30,7 @@ TV_STREAMS = {
 # -----------------------
 YOUTUBE_STREAMS = {
 
- "unacademy_neet": "https://youtube.com/@uaneetenglish",
+ "unacademy_neet": "https://www.youtube.com/uaneetenglish/live",
 
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
