@@ -32,6 +32,8 @@ YOUTUBE_STREAMS = {
 
  "unacademy_neet": "https://www.youtube.com/uaneetenglish/live",
 
+"samastha": "https://youtube.com/@samasthaonlineoffical/live",
+
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
