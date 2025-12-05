@@ -140,35 +140,49 @@ threading.Thread(target=refresh_stream_urls, daemon=True).start()
 # MP3 converter helper (yt-dlp -> mp3 40kbps mono)
 # -----------------------
 def convert_to_mp3(url: str):
-    timestamp = str(int(time.time()))
-    out_template = os.path.join(CACHE_DIR, f"{timestamp}.%(ext)s")
+    try:
+        # Get the video ID from the URL
+        cmd_id = ["yt-dlp", "--get-id", url]
+        if os.path.exists(COOKIES_FILE):
+            cmd_id.insert(1, "--cookies")
+            cmd_id.insert(2, COOKIES_FILE)
 
-    cmd = [
+        logging.info("Getting video ID for: %s", url)
+        result = subprocess.run(cmd_id, capture_output=True, text=True, timeout=20)
+        video_id = result.stdout.strip()
+        if not video_id:
+            logging.warning("Could not get video ID, using timestamp")
+            video_id = str(int(time.time()))
+    except Exception as e:
+        logging.error("Failed to get video ID: %s", e)
+        video_id = str(int(time.time()))
+
+    # Output file template with video ID
+    out_template = os.path.join(CACHE_DIR, f"{video_id}.%(ext)s")
+
+    cmd_convert = [
         "yt-dlp",
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "40K",
         "--postprocessor-args", "ffmpeg:-ac 1 -b:a 40k -map_metadata -1",
         "-o", out_template,
-        url,
+        url
     ]
     if os.path.exists(COOKIES_FILE):
-        cmd.insert(1, "--cookies")
-        cmd.insert(2, COOKIES_FILE)
+        cmd_convert.insert(1, "--cookies")
+        cmd_convert.insert(2, COOKIES_FILE)
 
-    logging.info("Running yt-dlp to convert: %s", url)
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    logging.info("Converting to MP3: %s", url)
+    proc = subprocess.run(cmd_convert, capture_output=True, text=True, timeout=300)
     if proc.returncode != 0:
         logging.error("yt-dlp failed: %s", proc.stderr)
         return None
 
-    # find output mp3 file
-    candidates = glob(os.path.join(CACHE_DIR, f"{timestamp}.*"))
-    for c in candidates:
-        if c.lower().endswith(".mp3"):
-            return os.path.basename(c)
-    return os.path.basename(candidates[0]) if candidates else None
-
+    mp3_file = os.path.join(CACHE_DIR, f"{video_id}.mp3")
+    if os.path.exists(mp3_file):
+        return f"{video_id}.mp3"
+    return None
 
 # -----------------------
 # FFmpeg readiness check + streaming generator
