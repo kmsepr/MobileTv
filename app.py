@@ -169,23 +169,14 @@ def stream_audio_with_ffmpeg(input_url: str, timeout: float = 6.0):
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
-    # Combine TV and YouTube channels
-    tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
-    all_channels = tv_channels + live_youtube
 
-    if channel not in all_channels:
+    if channel not in live_youtube:
         abort(404)
 
-    # Choose URL: TV streams are direct, YouTube uses cached HLS
-    video_url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    video_url = CACHE.get(channel)
     if not video_url:
         return "Channel not ready", 503
-
-    # Determine prev/next channel for navigation
-    current_index = all_channels.index(channel)
-    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
-    next_channel = all_channels[(current_index + 1) % len(all_channels)]
 
     html = f"""
 <html>
@@ -202,32 +193,15 @@ a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-s
 document.addEventListener("DOMContentLoaded", function() {{
     const video = document.getElementById("player");
     const src = "{video_url}";
-
     if (video.canPlayType("application/vnd.apple.mpegurl")) {{
-        // Safari / iOS native HLS
         video.src = src;
     }} else if (Hls.isSupported()) {{
         const hls = new Hls({{ lowLatencyMode: true }});
         hls.loadSource(src);
         hls.attachMedia(video);
-        hls.on(Hls.Events.ERROR, function(event, data) {{
-            console.error("HLS.js error:", data);
-            // Optionally reload on fatal error
-            if (data.fatal) {{
-                hls.startLoad();
-            }}
-        }});
     }} else {{
         alert("⚠️ Browser cannot play HLS stream.");
     }}
-}});
-document.addEventListener("keydown", function(e) {{
-    const v = document.getElementById("player");
-    if(e.key==="4") window.location.href="/watch/{prev_channel}";
-    if(e.key==="6") window.location.href="/watch/{next_channel}";
-    if(e.key==="0") window.location.href="/";
-    if(e.key==="5" && v) {{ v.paused?v.play():v.pause(); }}
-    if(e.key==="9") window.location.reload();
 }});
 </script>
 </head>
@@ -236,25 +210,11 @@ document.addEventListener("keydown", function(e) {{
 <video id="player" controls autoplay playsinline></video>
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
-  <a href="/watch/{prev_channel}">⏮ Prev</a>
-  <a href="/watch/{next_channel}">⏭ Next</a>
-  <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
 </div>
 </body>
 </html>
 """
     return html
-
-@app.route("/stream/<channel>")
-def stream(channel):
-    url = CACHE.get(channel)
-    if not url: return "Channel not ready", 503
-    try:
-        r = requests.get(url, headers={"User-Agent":"Mozilla/5.0"}, stream=True, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        return f"Error fetching stream: {e}", 502
-    return Response(r.iter_content(chunk_size=8192), content_type=r.headers.get("Content-Type","application/vnd.apple.mpegurl"))
 
 @app.route("/audio/<channel>")
 def audio(channel):
@@ -291,21 +251,20 @@ def home():
 <html>
 <head>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Live + MP3</title>
+  <title>Live YouTube + MP3</title>
   <style>
-    :root{--bg:#0b0b0b;--card:#121212;--accent:#0ff;--muted:#9aa0a6}
-    body{margin:0;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#fff;background:var(--bg)}
+    body{margin:0;font-family:system-ui,Segoe UI,Roboto;color:#fff;background:#0b0b0b}
     .tabs{display:flex;justify-content:center;gap:12px;padding:14px;background:#000}
     .tab{padding:12px 18px;border-radius:10px;background:#111;cursor:pointer;font-size:20px}
-    .tab.active{background:var(--accent);color:#000;font-weight:700}
+    .tab.active{background:#0ff;color:#000;font-weight:700}
     .container{padding:16px;max-width:1100px;margin:0 auto}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}
-    .card{background:var(--card);padding:18px;border-radius:10px;text-align:center;font-size:20px}
-    .bigbtn{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:8px;background:transparent;border:1px solid var(--accent);color:var(--accent);text-decoration:none}
+    .card{background:#121212;padding:18px;border-radius:10px;text-align:center;font-size:20px}
+    .bigbtn{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:8px;background:transparent;border:1px solid #0ff;color:#0ff;text-decoration:none}
     form input{width:70%;padding:12px;font-size:18px;border-radius:8px;border:1px solid #333;background:#0b0b0b;color:#fff}
-    form button{padding:12px 16px;font-size:18px;border-radius:8px;margin-left:8px;background:var(--accent);color:#000;border:none}
+    form button{padding:12px 16px;font-size:18px;border-radius:8px;margin-left:8px;background:#0ff;color:#000;border:none}
     h1{font-size:24px;margin:6px 0}
-    small{color:var(--muted);display:block;margin-top:8px}
+    small{color:#9aa0a6;display:block;margin-top:8px}
   </style>
   <script>
     function showTab(id){
@@ -327,7 +286,7 @@ def home():
 
   <div class="container">
     <div id="live">
-      <h1>Live Channels (only available ones)</h1>
+      <h1>Live Channels</h1>
       <div class="grid">
       {% if youtube_channels %}
         {% for ch in youtube_channels %}
@@ -341,7 +300,7 @@ def home():
           </div>
         {% endfor %}
       {% else %}
-        <div class="card">No live channels available right now.</div>
+        <div class="card">No live channels available.</div>
       {% endif %}
       </div>
     </div>
@@ -375,6 +334,7 @@ def home():
 </html>
 """
     return render_template_string(html, youtube_channels=live_youtube, files=files)
+
 # -----------------------
 # Run server
 # -----------------------
