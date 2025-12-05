@@ -169,16 +169,64 @@ def stream_audio_with_ffmpeg(input_url: str, timeout: float = 6.0):
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
-    if channel not in CACHE:
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [name for name, live in LIVE_STATUS.items() if live]
+    all_channels = tv_channels + live_youtube
+    if channel not in all_channels:
         abort(404)
-    video_url = f"/stream/{channel}"
-    html = f"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>{channel}</title></head><body>
-    <h1>Watching {channel}</h1>
-    <video controls autoplay><source src="{video_url}" type="application/vnd.apple.mpegurl"></video>
-    <br><a href='/'>⬅ Back Home</a></body></html>"""
-    return html
 
+    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
+    current_index = all_channels.index(channel)
+    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
+    next_channel = all_channels[(current_index + 1) % len(all_channels)]
+
+    html = f"""
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{channel.replace('_',' ').title()}</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+body {{ background:#000; color:#fff; text-align:center; margin:0; padding:10px; }}
+video {{ width:95%; max-width:720px; height:auto; background:#000; border:1px solid #333; }}
+a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-size:18px; }}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function() {{
+  const video = document.getElementById("player");
+  const src = "{video_url}";
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+    video.src = src;
+  }} else if (Hls.isSupported()) {{
+    const hls = new Hls({{lowLatencyMode:true}});
+    hls.loadSource(src);
+    hls.attachMedia(video);
+  }} else {{
+    alert("⚠️ Browser cannot play HLS stream.");
+  }}
+}});
+document.addEventListener("keydown", function(e) {{
+  const v=document.getElementById("player");
+  if(e.key==="4")window.location.href="/watch/{prev_channel}";
+  if(e.key==="6")window.location.href="/watch/{next_channel}";
+  if(e.key==="0")window.location.href="/";
+  if(e.key==="5"&&v){{v.paused?v.play():v.pause();}}
+  if(e.key==="9")window.location.reload();
+}});
+</script>
+</head>
+<body>
+<h2>{channel.replace('_',' ').title()}</h2>
+<video id="player" controls autoplay playsinline></video>
+<div style="margin-top:15px;">
+  <a href="/">⬅ Home</a>
+  <a href="/watch/{prev_channel}">⏮ Prev</a>
+  <a href="/watch/{next_channel}">⏭ Next</a>
+  <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
+</div>
+</body>
+</html>"""
+    return html
 @app.route("/stream/<channel>")
 def stream(channel):
     url = CACHE.get(channel)
