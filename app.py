@@ -225,18 +225,6 @@ def stream_audio_with_ffmpeg(input_url: str, timeout: float = 6.0):
             pass
 
 
-# -----------------------
-# Flask routes
-# -----------------------
-@app.route("/")
-def home():
-    live_youtube = [n for n, ok in LIVE_STATUS.items() if ok]
-    files = sorted(os.listdir(CACHE_DIR), reverse=True)
-
-    html = """<html>... your existing template ...</html>"""  # truncated for brevity
-    return render_template_string(html, youtube_channels=live_youtube, files=files)
-
-
 @app.route("/watch/<channel>")
 def watch(channel):
     if channel not in CACHE:
