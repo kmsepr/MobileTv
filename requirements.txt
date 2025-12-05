@@ -1,10 +1,4 @@
 flask
-requests 
-fastapi
-uvicorn[standard]
+requests
 yt-dlp
-pydantic
-aiofiles
 jinja2
-python-multipart
-beautifulsoup4
