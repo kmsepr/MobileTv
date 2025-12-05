@@ -1,3 +1,10 @@
 flask
-yt-dlp
 requests 
+fastapi
+uvicorn[standard]
+yt-dlp
+pydantic
+aiofiles
+jinja2
+python-multipart
+beautifulsoup4
