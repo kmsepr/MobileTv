@@ -229,8 +229,58 @@ def stream_audio_with_ffmpeg(input_url: str, timeout: float = 6.0):
 def watch(channel):
     if channel not in CACHE:
         abort(404)
-    video_url = f"/stream/{channel}"
-    html = f"""<html>... HLS player template ...</html>"""
+    
+    # Use the direct stream URL (HLS) from CACHE
+    video_url = f"/stream/{channel}"  # your streaming route
+
+    html = f"""
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Watching {channel.replace('_', ' ').title()}</title>
+  <style>
+    body {{
+      background: #0b0b0b;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }}
+    video {{
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      margin-top: 20px;
+      border-radius: 10px;
+      background: #000;
+    }}
+    a {{
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #0ff;
+      color: #000;
+      text-decoration: none;
+      font-weight: bold;
+    }}
+  </style>
+</head>
+<body>
+  <h1>Watching: {channel.replace('_', ' ').title()}</h1>
+  
+  <!-- HTML5 video player (HLS) -->
+  <video controls autoplay>
+    <source src="{video_url}" type="application/vnd.apple.mpegurl">
+    Your browser does not support HLS playback. Try Safari or Chrome.
+  </video>
+
+  <br>
+  <a href="/">⬅ Back Home</a>
+</body>
+</html>
+"""
     return html
 
 
