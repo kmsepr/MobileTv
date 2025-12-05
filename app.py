@@ -1,35 +1,42 @@
-# -----------------------
-# Imports
-# -----------------------
-import os, time, threading, logging, subprocess, requests, select
-from flask import Flask, Response, render_template_string, request, abort, send_from_directory
+import time
+import threading
+import logging
+from flask import Flask, Response, render_template_string, abort
+import subprocess, os, requests
 
-# -----------------------
-# Logging
-# -----------------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# -----------------------
-# Flask App
-# -----------------------
 app = Flask(__name__)
 
 # -----------------------
-# Config
+# TV Streams (direct m3u8)
 # -----------------------
-CACHE_DIR = "/mnt/data/mp3_cache"
-os.makedirs(CACHE_DIR, exist_ok=True)
-COOKIES_FILE = "/mnt/data/cookies.txt"
+TV_STREAMS = {
+    "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
+    "dd_sports": "https://cdn-6.pishow.tv/live/13/master.m3u8",
+    "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
+    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
+    "bloomberg_tv": "https://bloomberg.com/media-manifest/streams/us.m3u8",
+    "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
+    "aqsa_tv": "http://167.172.161.13/hls/feedspare/6udfi7v8a3eof6nlps6e9ovfrs65c7l7.m3u8",
+    "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
+    "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
+    "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
+    "al_sahat": "https://assahat.b-cdn.net/Assahat/assahatobs/index.m3u8",
+}
 
 # -----------------------
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
-    "unacademy_neet": "https://www.youtube.com/@uaneetenglish/live",
-    "samastha": "https://youtube.com/@samasthaonlineoffical/live",
+
+ "unacademy_neet": "https://www.youtube.com/uaneetenglish/live",
+
+"samastha": "https://youtube.com/@samasthaonlineoffical/live",
+
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
-    "qsc_mukkam": "https://www.youtube.com/@quranstudycentremukkam/live",
+    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
@@ -46,54 +53,54 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
     "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
+    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
-CHANNEL_LOGOS = {k: "" for k in YOUTUBE_STREAMS.keys()}
+# -----------------------
+# Channel Logos
+# -----------------------
+CHANNEL_LOGOS = {
+    "safari_tv": "https://i.imgur.com/dSOfYyh.png",
+    "victers_tv": "https://i.imgur.com/kj4OEsb.png",
+    "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
+    "france_24": "https://upload.wikimedia.org/wikipedia/commons/c/c1/France_24_logo_%282013%29.svg",
+    "aqsa_tv": "https://i.imgur.com/Z2rfrQ8.png",
+    "mazhavil_manorama": "https://i.imgur.com/fjgzW20.png",
+    "dd_malayalam": "https://i.imgur.com/ywm2dTl.png",
+    "dd_sports": "https://i.imgur.com/J2Ky5OO.png",
+    "mult": "https://i.imgur.com/xi351Fx.png",
+    "yemen_today": "https://i.imgur.com/8TzcJu5.png",
+    "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
+    "al_sahat": "https://i.imgur.com/UVndAta.png",
+    **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
+}
+
+CACHE = {}
+LIVE_STATUS = {}
+COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Runtime caches
-# -----------------------
-CACHE = {}        # channel -> direct HLS URL
-LIVE_STATUS = {}  # channel -> True/False
-
-# -----------------------
-# Helper: check live page
-# -----------------------
-def is_live_page_reachable(url: str) -> bool:
-    try:
-        r = requests.get(url, timeout=4)
-        return r.status_code == 200
-    except Exception:
-        return False
-
-# -----------------------
-# Helper: get direct HLS URL from YouTube
+# Extract YouTube HLS URL
 # -----------------------
 def get_youtube_live_url(youtube_url: str):
-    if not is_live_page_reachable(youtube_url):
-        return None
     try:
         cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", youtube_url]
         if os.path.exists(COOKIES_FILE):
             cmd.insert(1, "--cookies")
             cmd.insert(2, COOKIES_FILE)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
-        out = result.stdout.strip()
-        err = result.stderr.lower()
-        if "sign in to confirm" in err or "unable to extract" in err:
-            return None
-        if result.returncode == 0 and out:
-            return out.splitlines()[0]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
     except Exception:
-        return None
+        pass
     return None
 
 # -----------------------
-# Background thread: refresh YouTube live URLs
+# Background refresh thread
 # -----------------------
 def refresh_stream_urls():
     while True:
-        logging.info("Refreshing YouTube live URLs...")
+        logging.info("🔄 Refreshing YouTube live URLs...")
         for name, url in YOUTUBE_STREAMS.items():
             direct_url = get_youtube_live_url(url)
             if direct_url:
@@ -101,82 +108,93 @@ def refresh_stream_urls():
                 LIVE_STATUS[name] = True
             else:
                 LIVE_STATUS[name] = False
-                if name in CACHE:
-                    del CACHE[name]
-        time.sleep(60)  # refresh every 60s
+        time.sleep(60)
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# MP3 converter
+# Home Page (with visible tabs)
 # -----------------------
-def convert_to_mp3(url: str):
-    try:
-        cmd_id = ["yt-dlp", "--get-id", url]
-        if os.path.exists(COOKIES_FILE):
-            cmd_id.insert(1, "--cookies")
-            cmd_id.insert(2, COOKIES_FILE)
-        result = subprocess.run(cmd_id, capture_output=True, text=True, timeout=20)
-        video_id = result.stdout.strip() or str(int(time.time()))
-    except Exception:
-        video_id = str(int(time.time()))
-    out_template = os.path.join(CACHE_DIR, f"{video_id}.%(ext)s")
-    cmd_convert = [
-        "yt-dlp", "--extract-audio", "--audio-format", "mp3",
-        "--audio-quality", "40K", "--postprocessor-args", "ffmpeg:-ac 1 -b:a 40k -map_metadata -1",
-        "-o", out_template, url
-    ]
-    if os.path.exists(COOKIES_FILE):
-        cmd_convert.insert(1, "--cookies")
-        cmd_convert.insert(2, COOKIES_FILE)
-    subprocess.run(cmd_convert, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300)
-    mp3_file = os.path.join(CACHE_DIR, f"{video_id}.mp3")
-    return f"{video_id}.mp3" if os.path.exists(mp3_file) else None
+@app.route("/")
+def home():
+    tv_channels = list(TV_STREAMS.keys())
+    live_youtube = [n for n, live in LIVE_STATUS.items() if live]
+
+    html = """
+<html>
+<head>
+<title>📺 TV & YouTube Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:0; }
+h2 { text-align:center; margin:10px 0; }
+.tabs { display:flex; justify-content:center; background:#000; padding:10px; }
+.tab { padding:10px 20px; cursor:pointer; background:#222; color:#0ff; border-radius:10px; margin:0 5px; transition:0.2s; }
+.tab.active { background:#0ff; color:#000; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; padding:10px; }
+.card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
+.card:hover { background:#333; }
+.card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
+.card span { font-size:14px; color:#0f0; }
+.hidden { display:none; }
+</style>
+<script>
+function showTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.grid').forEach(g=>g.classList.add('hidden'));
+  document.getElementById(tab).classList.remove('hidden');
+  document.getElementById('tab_'+tab).classList.add('active');
+}
+window.onload=()=>showTab('tv');
+</script>
+</head>
+<body>
+<div class="tabs">
+  <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV</div>
+  <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube</div>
+</div>
+
+<div id="tv" class="grid">
+{% for key in tv_channels %}
+<div class="card">
+    <img src="{{ logos.get(key) }}">
+    <span>{{ key.replace('_',' ').title() }}</span><br>
+    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
+    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
+</div>
+{% endfor %}
+</div>
+
+<div id="youtube" class="grid hidden">
+{% for key in youtube_channels %}
+<div class="card">
+    <img src="{{ logos.get(key) }}">
+    <span>{{ key.replace('_',' ').title() }}</span><br>
+    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
+    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
+</div>
+{% endfor %}
+</div>
+</body>
+</html>
+"""
+    return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
 
 # -----------------------
-# FFmpeg stream generator
-# -----------------------
-def stream_audio_with_ffmpeg(input_url: str, timeout: float = 6.0):
-    cmd = ["ffmpeg","-nostdin","-hide_banner","-loglevel","error","-i",input_url,"-vn","-ac","1","-b:a","40k","-f","mp3","pipe:1"]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start = time.time()
-    first_chunk = b""
-    try:
-        while True:
-            if proc.poll() is not None:
-                raise RuntimeError("ffmpeg exited early")
-            rlist, _, _ = select.select([proc.stdout.fileno()], [], [], 0.2)
-            if rlist:
-                first_chunk = proc.stdout.read(1024)
-                if first_chunk: break
-            if time.time() - start > timeout:
-                proc.terminate()
-                raise RuntimeError("ffmpeg timeout")
-    except Exception:
-        proc.terminate()
-        raise
-    yield first_chunk
-    try:
-        while True:
-            chunk = proc.stdout.read(4096)
-            if not chunk: break
-            yield chunk
-    finally:
-        proc.terminate()
-
-# -----------------------
-# Routes
+# Watch Route
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
+    tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
-
-    if channel not in live_youtube:
+    all_channels = tv_channels + live_youtube
+    if channel not in all_channels:
         abort(404)
 
-    video_url = CACHE.get(channel)
-    if not video_url:
-        return "Channel not ready", 503
+    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
+    current_index = all_channels.index(channel)
+    prev_channel = all_channels[(current_index - 1) % len(all_channels)]
+    next_channel = all_channels[(current_index + 1) % len(all_channels)]
 
     html = f"""
 <html>
@@ -191,17 +209,25 @@ a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-s
 </style>
 <script>
 document.addEventListener("DOMContentLoaded", function() {{
-    const video = document.getElementById("player");
-    const src = "{video_url}";
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {{
-        video.src = src;
-    }} else if (Hls.isSupported()) {{
-        const hls = new Hls({{ lowLatencyMode: true }});
-        hls.loadSource(src);
-        hls.attachMedia(video);
-    }} else {{
-        alert("⚠️ Browser cannot play HLS stream.");
-    }}
+  const video = document.getElementById("player");
+  const src = "{video_url}";
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+    video.src = src;
+  }} else if (Hls.isSupported()) {{
+    const hls = new Hls({{lowLatencyMode:true}});
+    hls.loadSource(src);
+    hls.attachMedia(video);
+  }} else {{
+    alert("⚠️ Browser cannot play HLS stream.");
+  }}
+}});
+document.addEventListener("keydown", function(e) {{
+  const v=document.getElementById("player");
+  if(e.key==="4")window.location.href="/watch/{prev_channel}";
+  if(e.key==="6")window.location.href="/watch/{next_channel}";
+  if(e.key==="0")window.location.href="/";
+  if(e.key==="5"&&v){{v.paused?v.play():v.pause();}}
+  if(e.key==="9")window.location.reload();
 }});
 </script>
 </head>
@@ -210,134 +236,68 @@ document.addEventListener("DOMContentLoaded", function() {{
 <video id="player" controls autoplay playsinline></video>
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
+  <a href="/watch/{prev_channel}">⏮ Prev</a>
+  <a href="/watch/{next_channel}">⏭ Next</a>
+  <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
 </div>
 </body>
-</html>
-"""
+</html>"""
     return html
 
-@app.route("/audio/<channel>")
-def audio(channel):
+# -----------------------
+# Proxy Stream
+# -----------------------
+@app.route("/stream/<channel>")
+def stream(channel):
     url = CACHE.get(channel)
-    if not url: return "Channel not ready", 503
-    return Response(stream_audio_with_ffmpeg(url), mimetype="audio/mpeg")
+    if not url:
+        return "Channel not ready", 503
 
-@app.route("/convert", methods=["POST"])
-def convert():
-    url = request.form.get("url")
-    if not url: return "No URL provided", 400
-    filename = convert_to_mp3(url)
-    return f"Saved: {filename} <br><a href='/'>Back</a>" if filename else "Conversion failed", 500
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        return f"Error fetching stream: {e}", 502
 
-@app.route("/mp3/<file>")
-def serve_mp3(file):
-    safe_path = os.path.join(CACHE_DIR, file)
-    if not os.path.isfile(safe_path): abort(404)
-    return send_from_directory(CACHE_DIR, file, mimetype="audio/mpeg")
+    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
+    return Response(r.content, content_type=content_type)
 
-@app.route("/download/<file>")
-def download(file):
-    safe_path = os.path.join(CACHE_DIR, file)
-    if not os.path.isfile(safe_path): abort(404)
-    return send_from_directory(CACHE_DIR, file, as_attachment=True)
+@app.route("/audio/<channel>")
+def audio_only(channel):
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
 
-@app.route("/")
-def home():
-    live_youtube = [ch for ch in YOUTUBE_STREAMS.keys() if LIVE_STATUS.get(ch)]
-    files = sorted(os.listdir(CACHE_DIR), reverse=True)
+    filename = f"{channel}.mp3"
 
-    html = """
-<!doctype html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Live YouTube + MP3</title>
-  <style>
-    body{margin:0;font-family:system-ui,Segoe UI,Roboto;color:#fff;background:#0b0b0b}
-    .tabs{display:flex;justify-content:center;gap:12px;padding:14px;background:#000}
-    .tab{padding:12px 18px;border-radius:10px;background:#111;cursor:pointer;font-size:20px}
-    .tab.active{background:#0ff;color:#000;font-weight:700}
-    .container{padding:16px;max-width:1100px;margin:0 auto}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}
-    .card{background:#121212;padding:18px;border-radius:10px;text-align:center;font-size:20px}
-    .bigbtn{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:8px;background:transparent;border:1px solid #0ff;color:#0ff;text-decoration:none}
-    form input{width:70%;padding:12px;font-size:18px;border-radius:8px;border:1px solid #333;background:#0b0b0b;color:#fff}
-    form button{padding:12px 16px;font-size:18px;border-radius:8px;margin-left:8px;background:#0ff;color:#000;border:none}
-    h1{font-size:24px;margin:6px 0}
-    small{color:#9aa0a6;display:block;margin-top:8px}
-  </style>
-  <script>
-    function showTab(id){
-      document.getElementById('live').style.display='none';
-      document.getElementById('mp3').style.display='none';
-      document.getElementById(id).style.display='block';
-      document.getElementById('tab_live').classList.remove('active');
-      document.getElementById('tab_mp3').classList.remove('active');
-      document.getElementById('tab_'+id).classList.add('active');
-    }
-    window.onload=function(){ showTab('live'); }
-  </script>
-</head>
-<body>
-  <div class="tabs">
-    <div id="tab_live" class="tab active" onclick="showTab('live')">▶ YouTube Live</div>
-    <div id="tab_mp3" class="tab" onclick="showTab('mp3')">🎵 MP3 Converter</div>
-  </div>
+    def generate():
+        cmd = [
+            "ffmpeg", "-i", url,
+            "-vn",               # no video
+            "-ac", "1",          # mono
+            "-b:a", "40k",       # 40kbps
+            "-f", "mp3",
+            "pipe:1"
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
 
-  <div class="container">
-    <div id="live">
-      <h1>Live Channels</h1>
-      <div class="grid">
-      {% if youtube_channels %}
-        {% for ch in youtube_channels %}
-          <div class="card">
-            <div style="font-size:20px;font-weight:700">{{ ch.replace('_',' ').title() }}</div>
-            <small>Live</small>
-            <div style="margin-top:12px">
-              <a class="bigbtn" href="/watch/{{ ch }}">▶ Watch</a>
-              <a class="bigbtn" href="/audio/{{ ch }}">🎵 Audio</a>
-            </div>
-          </div>
-        {% endfor %}
-      {% else %}
-        <div class="card">No live channels available.</div>
-      {% endif %}
-      </div>
-    </div>
-
-    <div id="mp3" style="display:none">
-      <h1>MP3 Converter (40 kbps Mono)</h1>
-      <form method="POST" action="/convert">
-        <input name="url" placeholder="Paste YouTube link..." required />
-        <button type="submit">Convert</button>
-      </form>
-      <small>Cached files are stored on the server.</small>
-
-      <div class="grid" style="margin-top:18px">
-        {% if files %}
-          {% for f in files %}
-            <div class="card">
-              <div style="font-weight:700">{{ f }}</div>
-              <div style="margin-top:12px">
-                <a class="bigbtn" href="/mp3/{{ f }}">▶ Play</a>
-                <a class="bigbtn" href="/download/{{ f }}">⬇ Download</a>
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <div class="card">No cached MP3 files yet.</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-"""
-    return render_template_string(html, youtube_channels=live_youtube, files=files)
+    return Response(
+        generate(),
+        mimetype="audio/mpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 # -----------------------
-# Run server
+# Run Server
 # -----------------------
 if __name__ == "__main__":
-    logging.info("Starting Flask server on 0.0.0.0:8000")
     app.run(host="0.0.0.0", port=8000, debug=False)
