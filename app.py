@@ -29,35 +29,32 @@ TV_STREAMS = {
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
-
  "unacademy_neet": "https://www.youtube.com/uaneetenglish/live",
-
-"samastha": "https://youtube.com/@samasthaonlineoffical/live",
-
-    "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
-    "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
-    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
-    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
-    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
-    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
-    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
-    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
-    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
-    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
-    "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
-    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
-    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
-    "entri_app": "https://www.youtube.com/@entriapp/live",
-    "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
-    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
+ "samastha": "https://youtube.com/@samasthaonlineoffical/live",
+ "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+ "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
+ "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
+ "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
+ "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
+ "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
+ "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
+ "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
+ "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
+ "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
+ "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
+ "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
+ "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
+ "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
+ "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
+ "entri_app": "https://www.youtube.com/@entriapp/live",
+ "entri_ias": "https://www.youtube.com/@EntriIAS/live",
+ "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
+ "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
+ "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
 # -----------------------
-# Channel Logos
+# Logos
 # -----------------------
 CHANNEL_LOGOS = {
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
@@ -96,7 +93,7 @@ def get_youtube_live_url(youtube_url: str):
     return None
 
 # -----------------------
-# Background refresh thread
+# Background refresh
 # -----------------------
 def refresh_stream_urls():
     while True:
@@ -113,7 +110,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Home Page (with visible tabs)
+# Home Page (BIG ICON UI)
 # -----------------------
 @app.route("/")
 def home():
@@ -129,15 +126,18 @@ def home():
 body { font-family:sans-serif; background:#111; color:#fff; margin:0; padding:0; }
 h2 { text-align:center; margin:10px 0; }
 .tabs { display:flex; justify-content:center; background:#000; padding:10px; }
-.tab { padding:10px 20px; cursor:pointer; background:#222; color:#0ff; border-radius:10px; margin:0 5px; transition:0.2s; }
+.tab { padding:10px 20px; cursor:pointer; background:#222; color:#0ff;
+       border-radius:10px; margin:0 5px; transition:0.2s; }
 .tab.active { background:#0ff; color:#000; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; padding:10px; }
-.card { background:#222; border-radius:10px; padding:10px; text-align:center; transition:0.2s; }
-.card:hover { background:#333; }
+.card { background:#222; border-radius:10px; padding:10px; text-align:center; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
-.card span { font-size:14px; color:#0f0; }
+.btns { display:flex; justify-content:center; gap:18px; margin-top:8px; }
+.iconbtn { font-size:32px; background:#111; padding:8px 16px; border-radius:12px; color:#0ff; text-decoration:none; }
+.iconbtn:nth-child(2){ color:#ff0; }
 .hidden { display:none; }
 </style>
+
 <script>
 function showTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -147,8 +147,10 @@ function showTab(tab){
 }
 window.onload=()=>showTab('tv');
 </script>
+
 </head>
 <body>
+
 <div class="tabs">
   <div class="tab active" id="tab_tv" onclick="showTab('tv')">📺 TV</div>
   <div class="tab" id="tab_youtube" onclick="showTab('youtube')">▶ YouTube</div>
@@ -158,9 +160,12 @@ window.onload=()=>showTab('tv');
 {% for key in tv_channels %}
 <div class="card">
     <img src="{{ logos.get(key) }}">
-    <span>{{ key.replace('_',' ').title() }}</span><br>
-    <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
+    <span>{{ key.replace('_',' ').title() }}</span>
+
+    <div class="btns">
+        <a class="iconbtn" href="/watch/{{ key }}">▶</a>
+        <a class="iconbtn" href="/audio/{{ key }}">🎵</a>
+    </div>
 </div>
 {% endfor %}
 </div>
@@ -169,12 +174,16 @@ window.onload=()=>showTab('tv');
 {% for key in youtube_channels %}
 <div class="card">
     <img src="{{ logos.get(key) }}">
-    <span>{{ key.replace('_',' ').title() }}</span><br>
-    <a href="/watch/{{ key }}" style="color:#0ff;">▶</a> |
-    <a href="/audio/{{ key }}" style="color:#ff0;">🎵</a>
+    <span>{{ key.replace('_',' ').title() }}</span>
+
+    <div class="btns">
+        <a class="iconbtn" href="/watch/{{ key }}">▶</a>
+        <a class="iconbtn" href="/audio/{{ key }}">🎵</a>
+    </div>
 </div>
 {% endfor %}
 </div>
+
 </body>
 </html>
 """
@@ -188,6 +197,7 @@ def watch(channel):
     tv_channels = list(TV_STREAMS.keys())
     live_youtube = [name for name, live in LIVE_STATUS.items() if live]
     all_channels = tv_channels + live_youtube
+
     if channel not in all_channels:
         abort(404)
 
@@ -207,20 +217,21 @@ body {{ background:#000; color:#fff; text-align:center; margin:0; padding:10px; 
 video {{ width:95%; max-width:720px; height:auto; background:#000; border:1px solid #333; }}
 a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-size:18px; }}
 </style>
+
 <script>
 document.addEventListener("DOMContentLoaded", function() {{
   const video = document.getElementById("player");
   const src = "{video_url}";
+
   if (video.canPlayType("application/vnd.apple.mpegurl")) {{
     video.src = src;
   }} else if (Hls.isSupported()) {{
     const hls = new Hls({{lowLatencyMode:true}});
     hls.loadSource(src);
     hls.attachMedia(video);
-  }} else {{
-    alert("⚠️ Browser cannot play HLS stream.");
   }}
 }});
+
 document.addEventListener("keydown", function(e) {{
   const v=document.getElementById("player");
   if(e.key==="4")window.location.href="/watch/{prev_channel}";
@@ -234,6 +245,7 @@ document.addEventListener("keydown", function(e) {{
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
 <video id="player" controls autoplay playsinline></video>
+
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
   <a href="/watch/{prev_channel}">⏮ Prev</a>
@@ -241,11 +253,12 @@ document.addEventListener("keydown", function(e) {{
   <a href="/watch/{channel}" style="color:#0ff;">🔄 Reload</a>
 </div>
 </body>
-</html>"""
+</html>
+"""
     return html
 
 # -----------------------
-# Proxy Stream
+# Proxy Stream (YouTube → HLS)
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
@@ -263,6 +276,9 @@ def stream(channel):
     content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
     return Response(r.content, content_type=content_type)
 
+# -----------------------
+# Audio-only FFmpeg Proxy
+# -----------------------
 @app.route("/audio/<channel>")
 def audio_only(channel):
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
@@ -272,11 +288,11 @@ def audio_only(channel):
     def generate():
         cmd = [
             "ffmpeg",
-            "-re",               # important for CloudPhone!
+            "-re",
             "-i", url,
             "-vn",
             "-ac", "1",
-            "-ar", "44100",      # cloudphone friendly
+            "-ar", "44100",
             "-b:a", "40k",
             "-max_delay", "0",
             "-fflags", "nobuffer",
