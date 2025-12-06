@@ -271,10 +271,15 @@ def audio_only(channel):
 
     def generate():
         cmd = [
-            "ffmpeg", "-i", url,
-            "-vn",               # no video
-            "-ac", "1",          # mono
-            "-b:a", "40k",       # 40kbps
+            "ffmpeg",
+            "-re",               # important for CloudPhone!
+            "-i", url,
+            "-vn",
+            "-ac", "1",
+            "-ar", "44100",      # cloudphone friendly
+            "-b:a", "40k",
+            "-max_delay", "0",
+            "-fflags", "nobuffer",
             "-f", "mp3",
             "pipe:1"
         ]
@@ -288,10 +293,7 @@ def audio_only(channel):
         finally:
             proc.terminate()
 
-    return Response(
-        generate(),
-        mimetype="audio/mpeg"
-    )   # <-- No Content-Disposition (browser will play)
+    return Response(generate(), mimetype="audio/mpeg")
 
 # -----------------------
 # Run Server
