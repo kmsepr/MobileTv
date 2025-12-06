@@ -269,8 +269,6 @@ def audio_only(channel):
     if not url:
         return "Channel not ready", 503
 
-    filename = f"{channel}.mp3"
-
     def generate():
         cmd = [
             "ffmpeg", "-i", url,
@@ -292,9 +290,8 @@ def audio_only(channel):
 
     return Response(
         generate(),
-        mimetype="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+        mimetype="audio/mpeg"
+    )   # <-- No Content-Disposition (browser will play)
 
 # -----------------------
 # Run Server
