@@ -57,6 +57,8 @@ YOUTUBE_STREAMS = {
 # Logos
 # -----------------------
 CHANNEL_LOGOS = {
+
+"asianet_news": "https://imgur.com/LrHGfdC",
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
     "victers_tv": "https://i.imgur.com/kj4OEsb.png",
     "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
