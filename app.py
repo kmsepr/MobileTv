@@ -100,7 +100,7 @@ def refresh_stream_urls():
                 LIVE_STATUS[name] = True
             else:
                 LIVE_STATUS[name] = False
-        time.sleep(60)
+        time.sleep(600)
 
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
