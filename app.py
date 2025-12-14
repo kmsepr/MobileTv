@@ -11,6 +11,11 @@ app = Flask(__name__)
 # TV Streams (direct m3u8)
 # -----------------------
 TV_STREAMS = {
+
+
+"kairali_we": "https://cdn-3.pishow.tv/live/1530/master.m3u8",
+
+"amrita_tv": "https://ddash74r36xqp.cloudfront.net/master.m3u8",
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
     "dd_sports": "https://cdn-6.pishow.tv/live/13/master.m3u8",
     "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
