@@ -22,13 +22,15 @@ TV_STREAMS = {
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
-    "asianet_news": "https://asianetnews.vgcdn.net/ptnr-Embed/v1/manifest/611d79b11b77e2f571934fd80ca1413453772ac7/1c19363c-e4a0-4e4d-ba28-771d5615b88e/9bd4a057-456d-43de-b887-7b87b021f1cc/3.m3u8",
+    
 }
 
 # -----------------------
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
+
+"asianet_news": "https://www.youtube.com/@asianetnews/live",
  
  "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
  "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
