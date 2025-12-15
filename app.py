@@ -329,32 +329,30 @@ def video_only(channel):
             "-re",
             "-i", url,
 
-            "-map", "0:v:0",   # ✅ VIDEO ONLY
+            # ❌ REMOVE AUDIO COMPLETELY
+            "-map", "0:v:0",
+            "-an",
             "-sn",
             "-dn",
-            "-an",
 
-            "-vf", "scale=320:180",
-            "-r", "12",
+            # 📉 VERY LOW DATA SETTINGS
+            "-vf", "scale=240:136",   # ⬅ lower than this looks bad
+            "-r", "8",                # 8 FPS
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-tune", "zerolatency",
             "-pix_fmt", "yuv420p",
 
-            "-b:v", "100k",
-            "-maxrate", "120k",
-            "-bufsize", "240k",
+            # 🔻 BITRATE (2G SAFE)
+            "-b:v", "70k",
+            "-maxrate", "80k",
+            "-bufsize", "160k",
 
             "-f", "mpegts",
             "pipe:1"
         ]
 
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
-        )
-
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
                 data = proc.stdout.read(1024)
