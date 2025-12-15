@@ -248,7 +248,7 @@ document.addEventListener("keydown", function(e) {{
 </head>
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
-<video id="player" controls autoplay playsinline></video>
+<video id="player" controls autoplay muted playsinline></video>
 
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
@@ -323,21 +323,31 @@ def video_only(channel):
         return "Channel not ready", 503
 
     def generate():
-        cmd = [
-            "ffmpeg",
-            "-re",
-            "-i", url,
-            "-an",                 # ❌ remove audio
-            "-vf", "scale=320:-2", # 📉 reduce resolution (VERY important for 2G)
-            "-r", "15",            # 📉 low frame rate
-            "-b:v", "120k",        # 📉 low bitrate
-            "-maxrate", "150k",
-            "-bufsize", "300k",
-            "-preset", "ultrafast",
-            "-tune", "zerolatency",
-            "-f", "mpegts",
-            "pipe:1"
-        ]
+      cmd = [
+    "ffmpeg",
+    "-loglevel", "error",
+    "-re",
+    "-i", url,
+
+    "-map", "0:v:0",     # ✅ VIDEO ONLY (CRITICAL)
+    "-sn",               # ❌ no subtitles
+    "-dn",               # ❌ no data streams
+    "-an",               # ❌ no audio (extra safety)
+
+    "-vf", "scale=320:180",
+    "-r", "12",
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-tune", "zerolatency",
+    "-pix_fmt", "yuv420p",
+
+    "-b:v", "100k",
+    "-maxrate", "120k",
+    "-bufsize", "240k",
+
+    "-f", "mpegts",
+    "pipe:1"
+]
 
         proc = subprocess.Popen(
             cmd,
