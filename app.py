@@ -323,31 +323,31 @@ def video_only(channel):
         return "Channel not ready", 503
 
     def generate():
-      cmd = [
-    "ffmpeg",
-    "-loglevel", "error",
-    "-re",
-    "-i", url,
+        cmd = [
+            "ffmpeg",
+            "-loglevel", "error",
+            "-re",
+            "-i", url,
 
-    "-map", "0:v:0",     # ✅ VIDEO ONLY (CRITICAL)
-    "-sn",               # ❌ no subtitles
-    "-dn",               # ❌ no data streams
-    "-an",               # ❌ no audio (extra safety)
+            "-map", "0:v:0",   # ✅ VIDEO ONLY
+            "-sn",
+            "-dn",
+            "-an",
 
-    "-vf", "scale=320:180",
-    "-r", "12",
-    "-c:v", "libx264",
-    "-preset", "ultrafast",
-    "-tune", "zerolatency",
-    "-pix_fmt", "yuv420p",
+            "-vf", "scale=320:180",
+            "-r", "12",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-tune", "zerolatency",
+            "-pix_fmt", "yuv420p",
 
-    "-b:v", "100k",
-    "-maxrate", "120k",
-    "-bufsize", "240k",
+            "-b:v", "100k",
+            "-maxrate", "120k",
+            "-bufsize", "240k",
 
-    "-f", "mpegts",
-    "pipe:1"
-]
+            "-f", "mpegts",
+            "pipe:1"
+        ]
 
         proc = subprocess.Popen(
             cmd,
