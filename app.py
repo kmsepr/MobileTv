@@ -329,24 +329,24 @@ def video_only(channel):
             "-re",
             "-i", url,
 
-            # 🎥 VIDEO (ULTRA LOW)
+            # VIDEO (EXTREME LOW)
             "-map", "0:v:0",
-            "-vf", "scale=240:136",
-            "-r", "8",
+            "-vf", "scale=176:100,format=gray",
+            "-r", "6",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-tune", "zerolatency",
             "-pix_fmt", "yuv420p",
-            "-b:v", "70k",
-            "-maxrate", "80k",
-            "-bufsize", "160k",
+            "-b:v", "45k",
+            "-maxrate", "50k",
+            "-bufsize", "100k",
 
-            # 🔊 VERY LOW AUDIO (VOICE ONLY)
+            # AUDIO (VERY VERY LOW)
             "-map", "0:a:0?",
             "-c:a", "aac",
             "-ac", "1",
             "-ar", "8000",
-            "-b:a", "16k",
+            "-b:a", "8k",
 
             "-f", "mpegts",
             "pipe:1"
