@@ -205,7 +205,7 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
-    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
+    video_url = TV_STREAMS.get(channel, f"/video_only/{channel}")
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
@@ -314,6 +314,47 @@ def audio_only(channel):
             proc.terminate()
 
     return Response(generate(), mimetype="audio/mpeg")
+
+
+@app.route("/video_only/<channel>")
+def video_only(channel):
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
+
+    def generate():
+        cmd = [
+            "ffmpeg",
+            "-re",
+            "-i", url,
+            "-an",                 # ❌ remove audio
+            "-vf", "scale=320:-2", # 📉 reduce resolution (VERY important for 2G)
+            "-r", "15",            # 📉 low frame rate
+            "-b:v", "120k",        # 📉 low bitrate
+            "-maxrate", "150k",
+            "-bufsize", "300k",
+            "-preset", "ultrafast",
+            "-tune", "zerolatency",
+            "-f", "mpegts",
+            "pipe:1"
+        ]
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
+        )
+
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
+
+    return Response(generate(), mimetype="video/mp2t")
 
 # -----------------------
 # Run Server
