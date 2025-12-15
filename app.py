@@ -329,24 +329,24 @@ def video_only(channel):
             "-re",
             "-i", url,
 
-            # ❌ REMOVE AUDIO COMPLETELY
+            # 🎥 VIDEO (ULTRA LOW)
             "-map", "0:v:0",
-            "-an",
-            "-sn",
-            "-dn",
-
-            # 📉 VERY LOW DATA SETTINGS
-            "-vf", "scale=240:136",   # ⬅ lower than this looks bad
-            "-r", "8",                # 8 FPS
+            "-vf", "scale=240:136",
+            "-r", "8",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-tune", "zerolatency",
             "-pix_fmt", "yuv420p",
-
-            # 🔻 BITRATE (2G SAFE)
             "-b:v", "70k",
             "-maxrate", "80k",
             "-bufsize", "160k",
+
+            # 🔊 VERY LOW AUDIO (VOICE ONLY)
+            "-map", "0:a:0?",
+            "-c:a", "aac",
+            "-ac", "1",
+            "-ar", "8000",
+            "-b:a", "16k",
 
             "-f", "mpegts",
             "pipe:1"
