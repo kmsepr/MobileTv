@@ -205,7 +205,7 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
-    video_url = TV_STREAMS.get(channel, f"/video_only/{channel}")
+    video_url = f"/video_only/{channel}"
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
