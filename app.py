@@ -314,34 +314,56 @@ def low_video(channel):
     if not url:
         return "Channel not ready", 503
 
-    # HLS output via pipe
-    def generate():
-        cmd = [
-            "ffmpeg",
-            "-i", url,
-            "-vf", "scale=256:144",
-            "-r", "10",
-            "-b:v", "70k",
-            "-ac", "1",
-            "-ar", "22050",
-            "-b:a", "20k",
-            "-f", "hls",
-            "-hls_time", "2",
-            "-hls_list_size", "3",
-            "-hls_flags", "delete_segments+omit_endlist",
-            "pipe:1"
-        ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        try:
-            while True:
-                chunk = proc.stdout.read(1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            proc.terminate()
+    tmp_dir = f"/tmp/{channel}_low"
+    os.makedirs(tmp_dir, exist_ok=True)
+    playlist = os.path.join(tmp_dir, "index.m3u8")
 
-    return Response(generate(), mimetype="application/vnd.apple.mpegurl")
+    # Start FFmpeg in background to generate segments
+    cmd = [
+        "ffmpeg",
+        "-i", url,
+        "-vf", "scale=256:144",
+        "-r", "10",
+        "-b:v", "70k",
+        "-ac", "1",
+        "-ar", "22050",
+        "-b:a", "20k",
+        "-f", "hls",
+        "-hls_time", "2",
+        "-hls_list_size", "3",
+        "-hls_flags", "delete_segments+omit_endlist",
+        playlist
+    ]
+    subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+
+    html = f"""
+    <html>
+    <head><script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script></head>
+    <body>
+    <video id="player" controls autoplay playsinline width="95%"></video>
+    <script>
+    var video = document.getElementById('player');
+    if(Hls.isSupported()) {{
+        var hls = new Hls();
+        hls.loadSource('/lowvideo_stream/{channel}');
+        hls.attachMedia(video);
+    }} else {{
+        video.src = '/lowvideo_stream/{channel}';
+    }}
+    </script>
+    </body>
+    </html>
+    """
+    return html
+
+@app.route("/lowvideo_stream/<channel>")
+def lowvideo_stream(channel):
+    tmp_dir = f"/tmp/{channel}_low"
+    playlist = os.path.join(tmp_dir, "index.m3u8")
+    if not os.path.exists(playlist):
+        return "Stream not ready", 503
+    with open(playlist, "rb") as f:
+        return Response(f.read(), mimetype="application/vnd.apple.mpegurl")
 
 # -----------------------
 # Run Server
