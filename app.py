@@ -1,7 +1,7 @@
 import time
 import threading
 import logging
-from flask import Flask, Response, render_template_string, abort
+from flask import Flask, Response, render_template_string, abort, request
 import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -11,11 +11,8 @@ app = Flask(__name__)
 # TV Streams (direct m3u8)
 # -----------------------
 TV_STREAMS = {
-
-
-"kairali_we": "https://cdn-3.pishow.tv/live/1530/master.m3u8",
-
-"amrita_tv": "https://ddash74r36xqp.cloudfront.net/master.m3u8",
+    "kairali_we": "https://cdn-3.pishow.tv/live/1530/master.m3u8",
+    "amrita_tv": "https://ddash74r36xqp.cloudfront.net/master.m3u8",
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
     "dd_sports": "https://cdn-6.pishow.tv/live/13/master.m3u8",
     "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
@@ -27,40 +24,31 @@ TV_STREAMS = {
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
-    
 }
 
 # -----------------------
 # YouTube Live Channels
 # -----------------------
 YOUTUBE_STREAMS = {
-
-"asianet_news": "https://www.youtube.com/@asianetnews/live",
- 
- "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
- "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
- "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
- "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
- "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
- 
- "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
- "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
- 
- "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
- "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
- "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
- 
- 
+    "asianet_news": "https://www.youtube.com/@asianetnews/live",
+    "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+    "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
+    "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
+    "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
+    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
+    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
+    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
+    "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
+    "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
+    "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
 }
 
 # -----------------------
 # Logos
 # -----------------------
 CHANNEL_LOGOS = {
-"amrita_tv": 
-"https://i.imgur.com/WdSjlPl.png",
-
-"kairali_we": "https://i.imgur.com/zXpROBj.png",
+    "amrita_tv": "https://i.imgur.com/WdSjlPl.png",
+    "kairali_we": "https://i.imgur.com/zXpROBj.png",
     "safari_tv": "https://i.imgur.com/dSOfYyh.png",
     "victers_tv": "https://i.imgur.com/kj4OEsb.png",
     "bloomberg_tv": "https://i.imgur.com/OuogLHx.png",
@@ -114,7 +102,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Home Page (BIG ICON UI)
+# Home Page
 # -----------------------
 @app.route("/")
 def home():
@@ -136,9 +124,10 @@ h2 { text-align:center; margin:10px 0; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; padding:10px; }
 .card { background:#222; border-radius:10px; padding:10px; text-align:center; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
-.btns { display:flex; justify-content:center; gap:18px; margin-top:8px; }
-.iconbtn { font-size:32px; background:#111; padding:8px 16px; border-radius:12px; color:#0ff; text-decoration:none; }
-.iconbtn:nth-child(2){ color:#ff0; }
+.btns { display:flex; justify-content:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.iconbtn { font-size:24px; background:#111; padding:6px 10px; border-radius:8px; color:#0ff; text-decoration:none; display:inline-block; }
+.iconbtn.low { color:#ff0; }
+.iconbtn.audio { color:#0f0; }
 .hidden { display:none; }
 </style>
 
@@ -151,7 +140,6 @@ function showTab(tab){
 }
 window.onload=()=>showTab('tv');
 </script>
-
 </head>
 <body>
 
@@ -165,10 +153,10 @@ window.onload=()=>showTab('tv');
 <div class="card">
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span>
-
     <div class="btns">
         <a class="iconbtn" href="/watch/{{ key }}">▶</a>
-        <a class="iconbtn" href="/audio/{{ key }}">🎵</a>
+        <a class="iconbtn low" href="/watch/{{ key }}?low=1">📶</a>
+        <a class="iconbtn audio" href="/audio/{{ key }}">🎵</a>
     </div>
 </div>
 {% endfor %}
@@ -179,10 +167,10 @@ window.onload=()=>showTab('tv');
 <div class="card">
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span>
-
     <div class="btns">
         <a class="iconbtn" href="/watch/{{ key }}">▶</a>
-        <a class="iconbtn" href="/audio/{{ key }}">🎵</a>
+        <a class="iconbtn low" href="/watch/{{ key }}?low=1">📶</a>
+        <a class="iconbtn audio" href="/audio/{{ key }}">🎵</a>
     </div>
 </div>
 {% endfor %}
@@ -205,7 +193,13 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
-    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
+    low = request.args.get("low") == "1"
+
+    if low:
+        video_url = f"/lowvideo/{channel}"
+    else:
+        video_url = TV_STREAMS.get(channel) or CACHE.get(channel) or f"/stream/{channel}"
+
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
@@ -226,7 +220,6 @@ a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-s
 document.addEventListener("DOMContentLoaded", function() {{
   const video = document.getElementById("player");
   const src = "{video_url}";
-
   if (video.canPlayType("application/vnd.apple.mpegurl")) {{
     video.src = src;
   }} else if (Hls.isSupported()) {{
@@ -235,7 +228,6 @@ document.addEventListener("DOMContentLoaded", function() {{
     hls.attachMedia(video);
   }}
 }});
-
 document.addEventListener("keydown", function(e) {{
   const v=document.getElementById("player");
   if(e.key==="4")window.location.href="/watch/{prev_channel}";
@@ -249,7 +241,6 @@ document.addEventListener("keydown", function(e) {{
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
 <video id="player" controls autoplay playsinline></video>
-
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
   <a href="/watch/{prev_channel}">⏮ Prev</a>
@@ -315,7 +306,9 @@ def audio_only(channel):
 
     return Response(generate(), mimetype="audio/mpeg")
 
-
+# -----------------------
+# Low Video FFmpeg Proxy
+# -----------------------
 @app.route("/lowvideo/<channel>")
 def low_video(channel):
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
@@ -330,33 +323,20 @@ def low_video(channel):
             "-flags", "low_delay",
             "-strict", "experimental",
             "-i", url,
-
-            # VIDEO (VERY LOW)
-            "-vf", "scale=256:144",   # 144p
-            "-r", "10",               # 10 fps
+            "-vf", "scale=256:144",
+            "-r", "10",
             "-b:v", "70k",
             "-maxrate", "80k",
             "-bufsize", "80k",
             "-g", "20",
             "-pix_fmt", "yuv420p",
-
-            # AUDIO (VERY LOW)
             "-ac", "1",
             "-ar", "22050",
             "-b:a", "20k",
-
-            # OUTPUT
             "-f", "mpegts",
             "pipe:1"
         ]
-
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            bufsize=0
-        )
-
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
         try:
             while True:
                 data = proc.stdout.read(1024)
@@ -367,6 +347,7 @@ def low_video(channel):
             proc.terminate()
 
     return Response(generate(), mimetype="video/mp2t")
+
 # -----------------------
 # Run Server
 # -----------------------
