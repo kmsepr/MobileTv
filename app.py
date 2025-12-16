@@ -94,11 +94,13 @@ threading.Thread(target=refresh_stream_urls, daemon=True).start()
 def launch_low_hls(channel, src_url):
     channel_dir = os.path.join(LOW_HLS_DIR, channel)
     os.makedirs(channel_dir, exist_ok=True)
-    playlist_path = os.path.join(channel_dir, "index.m3u8")
-
-    # Skip if already running
-    if getattr(launch_low_hls, f"{channel}_proc", None):
-        return
+    
+    # Check if process already exists
+    old_proc = getattr(launch_low_hls, f"{channel}_proc", None)
+    if old_proc and old_proc.poll() is None:
+        old_proc.terminate()   # gently stop
+        old_proc.wait(timeout=2)  # wait a moment
+        logging.info(f"🛑 Old low HLS process killed for {channel}")
 
     cmd = [
         "ffmpeg",
@@ -115,8 +117,10 @@ def launch_low_hls(channel, src_url):
         "-hls_time", "2",
         "-hls_list_size", "3",
         "-hls_flags", "delete_segments+omit_endlist",
-        os.path.join(channel_dir, "index.m3u8")
+        os.path.join(channel_dir, "index.m3u8"),
+        "-hls_segment_filename", os.path.join(channel_dir, "seg_%03d.ts")
     ]
+    
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     setattr(launch_low_hls, f"{channel}_proc", proc)
     logging.info(f"🚀 Low-res HLS launched for {channel}")
