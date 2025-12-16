@@ -101,22 +101,22 @@ def launch_low_hls(channel, src_url):
         return
 
     cmd = [
-    "ffmpeg",
-    "-i", url,
-    "-vf", "scale=160:90",   
-    "-r", "8",                
-    "-b:v", "30k",         
-    "-c:v", "libx264",
-    "-preset", "veryfast",
-    "-ac", "1",              
-    "-ar", "22050",          
-    "-b:a", "10k",            
-    "-f", "hls",
-    "-hls_time", "2",         
-    "-hls_list_size", "3",
-    "-hls_flags", "delete_segments+omit_endlist",
-    "pipe:1"
-     ]
+        "ffmpeg",
+        "-i", src_url,
+        "-vf", "scale=160:90",
+        "-r", "8",
+        "-b:v", "30k",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-ac", "1",
+        "-ar", "22050",
+        "-b:a", "10k",
+        "-f", "hls",
+        "-hls_time", "2",
+        "-hls_list_size", "3",
+        "-hls_flags", "delete_segments+omit_endlist",
+        os.path.join(channel_dir, "index.m3u8")
+    ]
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     setattr(launch_low_hls, f"{channel}_proc", proc)
     logging.info(f"🚀 Low-res HLS launched for {channel}")
