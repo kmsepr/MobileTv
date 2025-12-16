@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from flask import Flask, Response, render_template_string, abort, send_from_directory
-import subprocess, os, requests, signal
+import subprocess, os, signal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
@@ -16,8 +16,6 @@ TV_STREAMS = {
     "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
     "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
     "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
-    "bloomberg_tv": "https://bloomberg-bloomberg-3-br.samsung.wurl.tv/manifest/playlist.m3u8",
-    "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
 }
 
 # -----------------------
@@ -34,7 +32,6 @@ COOKIES_FILE = "/mnt/data/cookies.txt"
 
 LOW_DIR = "./lowhls"
 os.makedirs(LOW_DIR, exist_ok=True)
-
 LOW_PROCS = {}
 
 # -----------------------
@@ -42,7 +39,7 @@ LOW_PROCS = {}
 # -----------------------
 def get_youtube_live_url(url):
     try:
-        cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", url]
+        cmd = ["yt-dlp", "-f", "best", "-g", url]
         if os.path.exists(COOKIES_FILE):
             cmd.insert(1, "--cookies")
             cmd.insert(2, COOKIES_FILE)
@@ -76,8 +73,9 @@ def start_low(channel, src):
     out = os.path.join(LOW_DIR, channel)
     os.makedirs(out, exist_ok=True)
 
+    # Kill old FFmpeg if running
     if channel in LOW_PROCS and LOW_PROCS[channel].poll() is None:
-        return
+        os.killpg(os.getpgid(LOW_PROCS[channel].pid), signal.SIGTERM)
 
     cmd = [
         "ffmpeg",
@@ -106,7 +104,7 @@ def start_low(channel, src):
     )
 
 # -----------------------
-# Home
+# HOME (BIG UI)
 # -----------------------
 @app.route("/")
 def home():
@@ -114,24 +112,31 @@ def home():
     yt = [k for k, v in LIVE_STATUS.items() if v]
 
     return render_template_string("""
-    <h3>TV</h3>
+    <h1>📺 TV CHANNELS</h1>
     {% for k in tv %}
-      <p>{{k}} :
-      <a href="/watch/{{k}}">▶</a>
-      <a href="/audio/{{k}}">🎵</a>
-      <a href="/low/{{k}}">📉</a></p>
+      <p>
+        <b style="font-size:28px">{{k}}</b><br>
+        <a style="font-size:26px" href="/watch/{{k}}">▶ NORMAL</a> |
+        <a style="font-size:26px" href="/low/{{k}}">📉 LOW</a> |
+        <a style="font-size:26px" href="/audio/{{k}}">🎵 AUDIO</a>
+      </p>
+      <hr>
     {% endfor %}
-    <h3>YouTube</h3>
+
+    <h1>📡 YOUTUBE LIVE</h1>
     {% for k in yt %}
-      <p>{{k}} :
-      <a href="/watch/{{k}}">▶</a>
-      <a href="/audio/{{k}}">🎵</a>
-      <a href="/low/{{k}}">📉</a></p>
+      <p>
+        <b style="font-size:28px">{{k}}</b><br>
+        <a style="font-size:26px" href="/watch/{{k}}">▶ NORMAL</a> |
+        <a style="font-size:26px" href="/low/{{k}}">📉 LOW</a> |
+        <a style="font-size:26px" href="/audio/{{k}}">🎵 AUDIO</a>
+      </p>
+      <hr>
     {% endfor %}
     """, tv=tv, yt=yt)
 
 # -----------------------
-# Normal (RAW)
+# NORMAL (RAW M3U8)
 # -----------------------
 @app.route("/watch/<c>")
 def watch(c):
@@ -141,7 +146,7 @@ def watch(c):
 
     return f"""
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <video id=v controls autoplay></video>
+    <video id=v controls autoplay style="width:100%;height:auto"></video>
     <script>
     var v=document.getElementById('v');
     var s="{url}";
@@ -163,7 +168,7 @@ def low(c):
 
     return f"""
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <video id=v controls autoplay></video>
+    <video id=v controls autoplay style="width:100%;height:auto"></video>
     <script>
     var h=new Hls();
     h.loadSource("/lowhls/{c}/index.m3u8");
@@ -179,7 +184,7 @@ def lowfiles(p):
     return send_from_directory(LOW_DIR, p)
 
 # -----------------------
-# AUDIO ONLY (unchanged)
+# AUDIO ONLY
 # -----------------------
 @app.route("/audio/<c>")
 def audio(c):
@@ -190,7 +195,8 @@ def audio(c):
     def gen():
         p = subprocess.Popen(
             ["ffmpeg", "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-f", "mp3", "pipe:1"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
         )
         while True:
             d = p.stdout.read(1024)
@@ -201,7 +207,7 @@ def audio(c):
     return Response(gen(), mimetype="audio/mpeg")
 
 # -----------------------
-# Run
+# RUN
 # -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
