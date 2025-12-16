@@ -13,6 +13,7 @@ app = Flask(__name__)
 TV_STREAMS = {
 
 
+
 "kairali_we": "https://cdn-3.pishow.tv/live/1530/master.m3u8",
 
 "amrita_tv": "https://ddash74r36xqp.cloudfront.net/master.m3u8",
@@ -27,6 +28,8 @@ TV_STREAMS = {
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
+
+"tvs_drive": "https://rpn.bozztv.com/gusa/gusa-tvsdriveinmovie/index.m3u8",
     
 }
 
