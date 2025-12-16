@@ -315,6 +315,58 @@ def audio_only(channel):
 
     return Response(generate(), mimetype="audio/mpeg")
 
+
+@app.route("/lowvideo/<channel>")
+def low_video(channel):
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+    if not url:
+        return "Channel not ready", 503
+
+    def generate():
+        cmd = [
+            "ffmpeg",
+            "-re",
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-strict", "experimental",
+            "-i", url,
+
+            # VIDEO (VERY LOW)
+            "-vf", "scale=256:144",   # 144p
+            "-r", "10",               # 10 fps
+            "-b:v", "70k",
+            "-maxrate", "80k",
+            "-bufsize", "80k",
+            "-g", "20",
+            "-pix_fmt", "yuv420p",
+
+            # AUDIO (VERY LOW)
+            "-ac", "1",
+            "-ar", "22050",
+            "-b:a", "20k",
+
+            # OUTPUT
+            "-f", "mpegts",
+            "pipe:1"
+        ]
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=0
+        )
+
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
+
+    return Response(generate(), mimetype="video/mp2t")
 # -----------------------
 # Run Server
 # -----------------------
