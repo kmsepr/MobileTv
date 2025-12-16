@@ -13,7 +13,6 @@ app = Flask(__name__)
 TV_STREAMS = {
 
 
-
 "kairali_we": "https://cdn-3.pishow.tv/live/1530/master.m3u8",
 
 "amrita_tv": "https://ddash74r36xqp.cloudfront.net/master.m3u8",
@@ -28,8 +27,6 @@ TV_STREAMS = {
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
     "yemen_shabab": "https://starmenajo.com/hls/yemenshabab/index.m3u8",
-
-"tvs_drive": "https://rpn.bozztv.com/gusa/gusa-tvsdriveinmovie/index.m3u8",
     
 }
 
@@ -208,7 +205,7 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
-    video_url = f"/video_only/{channel}"
+    video_url = TV_STREAMS.get(channel, f"/stream/{channel}")
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
@@ -251,7 +248,7 @@ document.addEventListener("keydown", function(e) {{
 </head>
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
-<video id="player" controls autoplay muted playsinline></video>
+<video id="player" controls autoplay playsinline></video>
 
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
@@ -317,55 +314,6 @@ def audio_only(channel):
             proc.terminate()
 
     return Response(generate(), mimetype="audio/mpeg")
-
-
-@app.route("/video_only/<channel>")
-def video_only(channel):
-    url = TV_STREAMS.get(channel) or CACHE.get(channel)
-    if not url:
-        return "Channel not ready", 503
-
-    def generate():
-        cmd = [
-            "ffmpeg",
-            "-loglevel", "error",
-            "-re",
-            "-i", url,
-
-            # ❌ REMOVE AUDIO COMPLETELY
-            "-map", "0:v:0",
-            "-an",
-            "-sn",
-            "-dn",
-
-            # 📉 VERY LOW DATA SETTINGS
-            "-vf", "scale=240:136",   # ⬅ lower than this looks bad
-            "-r", "8",                # 8 FPS
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-tune", "zerolatency",
-            "-pix_fmt", "yuv420p",
-
-            # 🔻 BITRATE (2G SAFE)
-            "-b:v", "70k",
-            "-maxrate", "80k",
-            "-bufsize", "160k",
-
-            "-f", "mpegts",
-            "pipe:1"
-        ]
-
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        try:
-            while True:
-                data = proc.stdout.read(1024)
-                if not data:
-                    break
-                yield data
-        finally:
-            proc.terminate()
-
-    return Response(generate(), mimetype="video/mp2t")
 
 # -----------------------
 # Run Server
