@@ -314,40 +314,34 @@ def low_video(channel):
     if not url:
         return "Channel not ready", 503
 
+    # HLS output via pipe
     def generate():
         cmd = [
             "ffmpeg",
-            "-re",
-            "-fflags", "nobuffer",
-            "-flags", "low_delay",
-            "-strict", "experimental",
             "-i", url,
-            "-vf", "scale=256:144",   # 144p
-            "-r", "10",               # 10 fps
+            "-vf", "scale=256:144",
+            "-r", "10",
             "-b:v", "70k",
-            "-maxrate", "80k",
-            "-bufsize", "80k",
-            "-g", "20",
-            "-pix_fmt", "yuv420p",
             "-ac", "1",
             "-ar", "22050",
             "-b:a", "20k",
-            "-f", "mpegts",
+            "-f", "hls",
+            "-hls_time", "2",
+            "-hls_list_size", "3",
+            "-hls_flags", "delete_segments+omit_endlist",
             "pipe:1"
         ]
-
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
-
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
-                data = proc.stdout.read(1024)
-                if not data:
+                chunk = proc.stdout.read(1024)
+                if not chunk:
                     break
-                yield data
+                yield chunk
         finally:
             proc.terminate()
 
-    return Response(generate(), mimetype="video/mp2t")
+    return Response(generate(), mimetype="application/vnd.apple.mpegurl")
 
 # -----------------------
 # Run Server
