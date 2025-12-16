@@ -1,7 +1,7 @@
 import time
 import threading
 import logging
-from flask import Flask, Response, render_template_string, abort, request
+from flask import Flask, Response, render_template_string, abort
 import subprocess, os, requests
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -60,7 +60,6 @@ CHANNEL_LOGOS = {
     "mult": "https://i.imgur.com/xi351Fx.png",
     "yemen_today": "https://i.imgur.com/8TzcJu5.png",
     "yemen_shabab": "https://i.imgur.com/H5Oi2NS.png",
-    "al_sahat": "https://i.imgur.com/UVndAta.png",
     **{k: "https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" for k in YOUTUBE_STREAMS}
 }
 
@@ -102,7 +101,7 @@ def refresh_stream_urls():
 threading.Thread(target=refresh_stream_urls, daemon=True).start()
 
 # -----------------------
-# Home Page
+# Home Page (BIG ICON UI)
 # -----------------------
 @app.route("/")
 def home():
@@ -124,10 +123,9 @@ h2 { text-align:center; margin:10px 0; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; padding:10px; }
 .card { background:#222; border-radius:10px; padding:10px; text-align:center; }
 .card img { width:100%; height:80px; object-fit:contain; margin-bottom:8px; }
-.btns { display:flex; justify-content:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
-.iconbtn { font-size:24px; background:#111; padding:6px 10px; border-radius:8px; color:#0ff; text-decoration:none; display:inline-block; }
-.iconbtn.low { color:#ff0; }
-.iconbtn.audio { color:#0f0; }
+.btns { display:flex; justify-content:center; gap:18px; margin-top:8px; }
+.iconbtn { font-size:32px; background:#111; padding:8px 16px; border-radius:12px; color:#0ff; text-decoration:none; }
+.iconbtn:nth-child(2){ color:#ff0; }
 .hidden { display:none; }
 </style>
 
@@ -140,6 +138,7 @@ function showTab(tab){
 }
 window.onload=()=>showTab('tv');
 </script>
+
 </head>
 <body>
 
@@ -153,10 +152,11 @@ window.onload=()=>showTab('tv');
 <div class="card">
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span>
+
     <div class="btns">
         <a class="iconbtn" href="/watch/{{ key }}">▶</a>
-        <a class="iconbtn low" href="/watch/{{ key }}?low=1">📶</a>
-        <a class="iconbtn audio" href="/audio/{{ key }}">🎵</a>
+        <a class="iconbtn" href="/audio/{{ key }}">🎵</a>
+        <a class="iconbtn" href="/lowvideo/{{ key }}">🔽</a>
     </div>
 </div>
 {% endfor %}
@@ -167,10 +167,11 @@ window.onload=()=>showTab('tv');
 <div class="card">
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span>
+
     <div class="btns">
         <a class="iconbtn" href="/watch/{{ key }}">▶</a>
-        <a class="iconbtn low" href="/watch/{{ key }}?low=1">📶</a>
-        <a class="iconbtn audio" href="/audio/{{ key }}">🎵</a>
+        <a class="iconbtn" href="/audio/{{ key }}">🎵</a>
+        <a class="iconbtn" href="/lowvideo/{{ key }}">🔽</a>
     </div>
 </div>
 {% endfor %}
@@ -182,7 +183,7 @@ window.onload=()=>showTab('tv');
     return render_template_string(html, tv_channels=tv_channels, youtube_channels=live_youtube, logos=CHANNEL_LOGOS)
 
 # -----------------------
-# Watch Route
+# Watch Route (Normal / Raw)
 # -----------------------
 @app.route("/watch/<channel>")
 def watch(channel):
@@ -193,13 +194,8 @@ def watch(channel):
     if channel not in all_channels:
         abort(404)
 
-    low = request.args.get("low") == "1"
-
-    if low:
-        video_url = f"/lowvideo/{channel}"
-    else:
-        video_url = TV_STREAMS.get(channel) or CACHE.get(channel) or f"/stream/{channel}"
-
+    # NORMAL RAW PLAY
+    video_url = TV_STREAMS.get(channel) or CACHE.get(channel)
     current_index = all_channels.index(channel)
     prev_channel = all_channels[(current_index - 1) % len(all_channels)]
     next_channel = all_channels[(current_index + 1) % len(all_channels)]
@@ -220,6 +216,7 @@ a {{ color:#0f0; text-decoration:none; margin:10px; display:inline-block; font-s
 document.addEventListener("DOMContentLoaded", function() {{
   const video = document.getElementById("player");
   const src = "{video_url}";
+
   if (video.canPlayType("application/vnd.apple.mpegurl")) {{
     video.src = src;
   }} else if (Hls.isSupported()) {{
@@ -228,6 +225,7 @@ document.addEventListener("DOMContentLoaded", function() {{
     hls.attachMedia(video);
   }}
 }});
+
 document.addEventListener("keydown", function(e) {{
   const v=document.getElementById("player");
   if(e.key==="4")window.location.href="/watch/{prev_channel}";
@@ -241,6 +239,7 @@ document.addEventListener("keydown", function(e) {{
 <body>
 <h2>{channel.replace('_',' ').title()}</h2>
 <video id="player" controls autoplay playsinline></video>
+
 <div style="margin-top:15px;">
   <a href="/">⬅ Home</a>
   <a href="/watch/{prev_channel}">⏮ Prev</a>
@@ -323,8 +322,8 @@ def low_video(channel):
             "-flags", "low_delay",
             "-strict", "experimental",
             "-i", url,
-            "-vf", "scale=256:144",
-            "-r", "10",
+            "-vf", "scale=256:144",   # 144p
+            "-r", "10",               # 10 fps
             "-b:v", "70k",
             "-maxrate", "80k",
             "-bufsize", "80k",
@@ -336,7 +335,9 @@ def low_video(channel):
             "-f", "mpegts",
             "pipe:1"
         ]
+
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
+
         try:
             while True:
                 data = proc.stdout.read(1024)
