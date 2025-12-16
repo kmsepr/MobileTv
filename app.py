@@ -1,186 +1,207 @@
 import time
 import threading
 import logging
-import subprocess
-import os
-
 from flask import Flask, Response, render_template_string, abort, send_from_directory
+import subprocess, os, requests, signal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 app = Flask(__name__)
 
-# ======================================================
-# STREAM SOURCES
-# ======================================================
+# -----------------------
+# TV Streams
+# -----------------------
 TV_STREAMS = {
-    "kairali_we": "https://cdn-3.pishow.tv/live/1530/master.m3u8",
-    "amrita_tv": "https://ddash74r36xqp.cloudfront.net/master.m3u8",
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
     "dd_sports": "https://cdn-6.pishow.tv/live/13/master.m3u8",
+    "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
+    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
+    "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
+    "bloomberg_tv": "https://bloomberg-bloomberg-3-br.samsung.wurl.tv/manifest/playlist.m3u8",
+    "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
 }
 
-# ======================================================
-# STORAGE (NOT TEMP)
-# ======================================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOW_HLS_DIR = os.path.join(BASE_DIR, "lowhls")
-os.makedirs(LOW_HLS_DIR, exist_ok=True)
+# -----------------------
+# YouTube Live
+# -----------------------
+YOUTUBE_STREAMS = {
+    "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
+    "shajahan_rahmani": "https://www.youtube.com/@ShajahanRahmaniOfficial/live",
+}
 
-# ======================================================
-# LOW VIDEO LIVE TRANSCODER (VIDEO ONLY ~40 KBPS)
-# ======================================================
-def launch_low_hls(channel, src_url):
-    channel_dir = os.path.join(LOW_HLS_DIR, channel)
-    os.makedirs(channel_dir, exist_ok=True)
+CACHE = {}
+LIVE_STATUS = {}
+COOKIES_FILE = "/mnt/data/cookies.txt"
 
-    # Kill old FFmpeg if running
-    old_proc = getattr(launch_low_hls, f"{channel}_proc", None)
-    if old_proc and old_proc.poll() is None:
-        old_proc.terminate()
-        old_proc.wait(timeout=2)
-        logging.info(f"🛑 Old FFmpeg stopped for {channel}")
+LOW_DIR = "./lowhls"
+os.makedirs(LOW_DIR, exist_ok=True)
+
+LOW_PROCS = {}
+
+# -----------------------
+# YouTube extractor
+# -----------------------
+def get_youtube_live_url(url):
+    try:
+        cmd = ["yt-dlp", "-f", "best[height<=360]", "-g", url]
+        if os.path.exists(COOKIES_FILE):
+            cmd.insert(1, "--cookies")
+            cmd.insert(2, COOKIES_FILE)
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except:
+        pass
+    return None
+
+# -----------------------
+# Refresh thread
+# -----------------------
+def refresh():
+    while True:
+        for k, v in YOUTUBE_STREAMS.items():
+            u = get_youtube_live_url(v)
+            if u:
+                CACHE[k] = u
+                LIVE_STATUS[k] = True
+            else:
+                LIVE_STATUS[k] = False
+        time.sleep(60)
+
+threading.Thread(target=refresh, daemon=True).start()
+
+# -----------------------
+# Start LOW video FFmpeg
+# -----------------------
+def start_low(channel, src):
+    out = os.path.join(LOW_DIR, channel)
+    os.makedirs(out, exist_ok=True)
+
+    if channel in LOW_PROCS and LOW_PROCS[channel].poll() is None:
+        return
 
     cmd = [
         "ffmpeg",
-        "-y",
-        "-i", src_url,
-
-        # ❌ NO AUDIO
+        "-i", src,
         "-an",
-
-        # 🎥 240px VIDEO
-        "-vf", "scale=240:160",
+        "-vf", "scale=240:-2",
         "-r", "6",
-
         "-c:v", "libx264",
-        "-profile:v", "baseline",
         "-preset", "ultrafast",
-        "-tune", "zerolatency",
-
-        # 🎯 ~40 kbps VIDEO
+        "-profile:v", "baseline",
         "-b:v", "40k",
         "-maxrate", "40k",
         "-bufsize", "80k",
-
-        # 🟢 LIVE HLS
         "-f", "hls",
         "-hls_time", "1",
         "-hls_list_size", "3",
         "-hls_flags", "delete_segments+omit_endlist",
-        "-hls_segment_filename",
-        os.path.join(channel_dir, "seg_%03d.ts"),
-
-        os.path.join(channel_dir, "index.m3u8")
+        os.path.join(out, "index.m3u8")
     ]
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    setattr(launch_low_hls, f"{channel}_proc", proc)
+    LOW_PROCS[channel] = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        preexec_fn=os.setsid
+    )
 
-    logging.info(f"🚀 LIVE VIDEO-ONLY 40kbps started for {channel}")
-
-# ======================================================
-# HOME PAGE
-# ======================================================
+# -----------------------
+# Home
+# -----------------------
 @app.route("/")
 def home():
-    html = """
-    <html>
-    <head>
-    <title>📺 Live TV</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-    body { background:#111; color:#fff; font-family:sans-serif; }
-    .card { background:#222; padding:12px; margin:10px; border-radius:10px; }
-    a { color:#0ff; text-decoration:none; font-size:22px; }
-    </style>
-    </head>
-    <body>
-    <h2>📺 Live TV</h2>
-    {% for k in channels %}
-      <div class="card">
-        {{ k.replace('_',' ').title() }}<br><br>
-        <a href="/watch/{{k}}">▶ Normal</a> |
-        <a href="/lowvideo/{{k}}">🔽 Low</a>
-      </div>
+    tv = list(TV_STREAMS.keys())
+    yt = [k for k, v in LIVE_STATUS.items() if v]
+
+    return render_template_string("""
+    <h3>TV</h3>
+    {% for k in tv %}
+      <p>{{k}} :
+      <a href="/watch/{{k}}">▶</a>
+      <a href="/audio/{{k}}">🎵</a>
+      <a href="/low/{{k}}">📉</a></p>
     {% endfor %}
-    </body>
-    </html>
-    """
-    return render_template_string(html, channels=TV_STREAMS.keys())
+    <h3>YouTube</h3>
+    {% for k in yt %}
+      <p>{{k}} :
+      <a href="/watch/{{k}}">▶</a>
+      <a href="/audio/{{k}}">🎵</a>
+      <a href="/low/{{k}}">📉</a></p>
+    {% endfor %}
+    """, tv=tv, yt=yt)
 
-# ======================================================
-# NORMAL PLAY (RAW HLS)
-# ======================================================
-@app.route("/watch/<channel>")
-def watch(channel):
-    url = TV_STREAMS.get(channel)
+# -----------------------
+# Normal (RAW)
+# -----------------------
+@app.route("/watch/<c>")
+def watch(c):
+    url = TV_STREAMS.get(c) or CACHE.get(c)
     if not url:
         abort(404)
 
     return f"""
-    <html>
-    <head>
-    <title>{channel}</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    </head>
-    <body>
-    <h3>{channel}</h3>
-    <video id="v" controls autoplay playsinline style="width:95%"></video>
+    <video id=v controls autoplay></video>
     <script>
-      var v=document.getElementById('v');
-      var src="{url}";
-      if(Hls.isSupported()) {{
-        var h=new Hls(); h.loadSource(src); h.attachMedia(v);
-      }} else {{
-        v.src=src;
-      }}
+    var v=document.getElementById('v');
+    var s="{url}";
+    if(Hls.isSupported()){{var h=new Hls();h.loadSource(s);h.attachMedia(v);}}
+    else v.src=s;
     </script>
-    </body>
-    </html>
     """
 
-# ======================================================
-# LOW VIDEO PAGE
-# ======================================================
-@app.route("/lowvideo/<channel>")
-def lowvideo(channel):
-    url = TV_STREAMS.get(channel)
+# -----------------------
+# LOW VIDEO (40 kbps)
+# -----------------------
+@app.route("/low/<c>")
+def low(c):
+    url = TV_STREAMS.get(c) or CACHE.get(c)
     if not url:
         abort(404)
 
-    launch_low_hls(channel, url)
+    start_low(c, url)
 
     return f"""
-    <html>
-    <head>
-    <title>{channel} Low</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    </head>
-    <body>
-    <h3>{channel} (240px • 40kbps)</h3>
-    <video id="v" controls autoplay playsinline style="width:95%"></video>
+    <video id=v controls autoplay></video>
     <script>
-      var v=document.getElementById('v');
-      var src="/lowhls/{channel}/index.m3u8";
-      if(Hls.isSupported()) {{
-        var h=new Hls(); h.loadSource(src); h.attachMedia(v);
-      }} else {{
-        v.src=src;
-      }}
+    var h=new Hls();
+    h.loadSource("/lowhls/{c}/index.m3u8");
+    h.attachMedia(document.getElementById('v'));
     </script>
-    </body>
-    </html>
     """
 
-# ======================================================
-# SERVE HLS FILES
-# ======================================================
-@app.route("/lowhls/<channel>/<path:filename>")
-def serve_lowhls(channel, filename):
-    return send_from_directory(os.path.join(LOW_HLS_DIR, channel), filename)
+# -----------------------
+# Serve LOW HLS
+# -----------------------
+@app.route("/lowhls/<path:p>")
+def lowfiles(p):
+    return send_from_directory(LOW_DIR, p)
 
-# ======================================================
-# RUN
-# ======================================================
+# -----------------------
+# AUDIO ONLY (unchanged)
+# -----------------------
+@app.route("/audio/<c>")
+def audio(c):
+    url = TV_STREAMS.get(c) or CACHE.get(c)
+    if not url:
+        abort(404)
+
+    def gen():
+        p = subprocess.Popen(
+            ["ffmpeg", "-i", url, "-vn", "-ac", "1", "-b:a", "40k", "-f", "mp3", "pipe:1"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+        )
+        while True:
+            d = p.stdout.read(1024)
+            if not d:
+                break
+            yield d
+
+    return Response(gen(), mimetype="audio/mpeg")
+
+# -----------------------
+# Run
+# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
