@@ -291,37 +291,41 @@ def stream(channel):
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
+    # Get the URL from your sources
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
 
-    filename = f"{channel}.mp3"
-
     def generate():
+        # ffmpeg command: input URL, no video, mono, 40kbps MP3, output to pipe
         cmd = [
             "ffmpeg", "-i", url,
-            "-vn",               # no video
-            "-ac", "1",          # mono
-            "-b:a", "40k",       # 40kbps
+            "-vn",          # no video
+            "-ac", "1",     # mono
+            "-b:a", "40k",  # 40kbps
             "-f", "mp3",
             "pipe:1"
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
-            while True:
-                data = proc.stdout.read(1024)
-                if not data:
+            # Stream in chunks of 1024 bytes
+            for chunk in iter(lambda: proc.stdout.read(1024), b''):
+                if not chunk:
                     break
-                yield data
+                yield chunk
         finally:
             proc.terminate()
+            proc.wait()
 
+    # Return a streaming response
     return Response(
         generate(),
         mimetype="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
     )
-
 @app.route("/video/<channel>")
 def video_player(channel):
     if channel not in TV_STREAMS and channel not in CACHE:
