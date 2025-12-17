@@ -162,7 +162,8 @@ window.onload=()=>showTab('tv');
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span><br>
     <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-    <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
+<a href="/stream/{{ key }}" style="color:#f80;">🎥 Video Only</a> |
+<a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
 </div>
@@ -251,19 +252,44 @@ document.addEventListener("keydown", function(e) {{
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
-    url = CACHE.get(channel)
+    # Get source (either static or cached YouTube)
+    url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
 
-    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        return f"Error fetching stream: {e}", 502
+    # Transcode to 240p, 40 kbps video-only (no audio)
+    cmd = [
+        "ffmpeg", "-loglevel", "quiet", "-i", url,
+        "-vf", "scale=426:240",          # force 240p resolution
+        "-an",                           # no audio
+        "-c:v", "libx264",               # use H.264 codec
+        "-preset", "veryfast",
+        "-tune", "zerolatency",
+        "-b:v", "40k",                   # target 40 kbps
+        "-bufsize", "80k",
+        "-f", "hls",                     # output HLS chunks
+        "-hls_time", "4",
+        "-hls_list_size", "3",
+        "-hls_flags", "delete_segments",
+        "-"
+    ]
 
-    content_type = r.headers.get("Content-Type", "application/vnd.apple.mpegurl")
-    return Response(r.content, content_type=content_type)
+    # Stream output
+    def generate():
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            while True:
+                data = proc.stdout.read(1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.terminate()
+
+    return Response(
+        generate(),
+        mimetype="application/vnd.apple.mpegurl"
+    )
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
