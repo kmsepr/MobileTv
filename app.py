@@ -257,21 +257,19 @@ def stream(channel):
     if not url:
         return "Channel not ready", 503
 
-    # FFmpeg command: 240p, H.264 video + AAC audio
     cmd = [
         "ffmpeg",
         "-i", url,
         "-vf", "scale=426:240",   # 240p resolution
-        "-r", "25",               # 25 fps
+        "-r", "25",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "250k",           # low video bitrate
+        "-b:v", "250k",
         "-maxrate", "250k",
         "-bufsize", "500k",
         "-g", "50",
-        "-c:a", "aac",
-        "-b:a", "64k",            # audio bitrate
+        "-an",                     # no audio
         "-f", "mpegts",
         "pipe:1"
     ]
