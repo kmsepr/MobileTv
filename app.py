@@ -22,13 +22,13 @@ TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
     "dd_sports": "https://cdn-6.pishow.tv/live/13/master.m3u8",
     "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
-    
+
     "bloomberg_tv": "https://bloomberg-bloomberg-3-br.samsung.wurl.tv/manifest/playlist.m3u8",
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
     "aqsa_tv": "http://167.172.161.13/hls/feedspare/6udfi7v8a3eof6nlps6e9ovfrs65c7l7.m3u8",
     "mult": "http://stv.mediacdn.ru/live/cdn/mult/playlist.m3u8",
     "yemen_today": "https://video.yementdy.tv/hls/yementoday.m3u8",
-    
+
 }
 
 # -----------------------
@@ -41,10 +41,10 @@ YOUTUBE_STREAMS = {
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "asianet_news": "https://www.youtube.com/@asianetnews/live",
-    
+
     "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
     "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
-    
+
     "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
     "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
     "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
@@ -52,7 +52,7 @@ YOUTUBE_STREAMS = {
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    
+
     "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
 }
 
@@ -260,43 +260,30 @@ def stream(channel):
     cmd = [
         "ffmpeg",
         "-i", url,
-
-        # -------- VIDEO (ULTRA LOW) --------
-        "-vf", "scale=192:108:flags=fast_bilinear",  # below 144p
-        "-r", "10",                                  # very low fps
+        "-vf", "scale=256:144",   # 160p resolution
+        "-r", "15",                # low frame rate
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-profile:v", "baseline",
-        "-level", "3.0",
-        "-pix_fmt", "yuv420p",
-        "-b:v", "28k",
-        "-maxrate", "28k",
-        "-bufsize", "56k",
-        "-g", "20",
-
-        # -------- AUDIO (VOICE ONLY) --------
+        "-b:v", "40k",            # very low video bitrate
+        "-maxrate", "40k",
+        "-bufsize", "240k",
+        "-g", "30",
         "-c:a", "aac",
-        "-ac", "1",
-        "-ar", "16000",
-        "-b:a", "12k",
-
+        "-b:a", "16k",             # low bitrate audio
+        "-ac", "1",                # mono
         "-f", "mpegts",
         "pipe:1"
     ]
 
     def generate():
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
-        )
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
-                data = proc.stdout.read(1024)
-                if not data:
+                chunk = proc.stdout.read(1024)
+                if not chunk:
                     break
-                yield data
+                yield chunk
         finally:
             proc.terminate()
 
