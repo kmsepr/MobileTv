@@ -163,7 +163,7 @@ window.onload=()=>showTab('tv');
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span><br>
     <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-<a href="/video/{{ key }}" style="color:#f80;">🎥 Video Only</a> |
+<a href="/video/{{ key }}" style="color:#f80;">🎥 Low</a> |
 <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
@@ -260,7 +260,7 @@ def stream(channel):
     cmd = [
         "ffmpeg",
         "-i", url,
-        "-vf", "scale=240:320",      # 240x320
+        "-vf", "scale=320:240",      # Landscape 320x240
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
