@@ -257,23 +257,23 @@ def stream(channel):
     if not url:
         return "Channel not ready", 503
 
-   cmd = [
-    "ffmpeg",
-    "-i", url,
-    "-vf", "scale=176:144,setsar=1:1",
-    "-r", "15",
-    "-c:v", "libx264",
-    "-preset", "ultrafast",
-    "-tune", "zerolatency",
-    "-b:v", "30k",
-    "-maxrate", "30k",
-    "-bufsize", "60k",
-    "-g", "30",
-    "-c:a", "aac",
-    "-b:a", "5k",
-    "-f", "mpegts",
-    "pipe:1"
-      ]
+    cmd = [
+        "ffmpeg",
+        "-i", url,
+        "-vf", "scale=176:144,setsar=1:1",
+        "-r", "15",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-tune", "zerolatency",
+        "-b:v", "30k",
+        "-maxrate", "30k",
+        "-bufsize", "60k",
+        "-g", "30",
+        "-c:a", "aac",
+        "-b:a", "5k",
+        "-f", "mpegts",
+        "pipe:1"
+    ]
 
     def generate():
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
