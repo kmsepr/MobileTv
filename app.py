@@ -328,16 +328,16 @@ def video_only_player(channel):
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Only</title>
+<title>Video Only - {channel.replace('_',' ').title()}</title>
 <style>
-body {{ background:#000; margin:0; text-align:center; }}
-video {{ width:100%; max-height:100vh; background:#000; }}
-a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
+body {{ background:#000; margin:0; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }}
+video {{ width:240px; height:auto; background:#000; }}
+a {{ color:#0f0; font-size:16px; margin:5px; text-decoration:none; }}
 </style>
 </head>
 <body>
 
-<video id="v" controls autoplay playsinline style="width:240px; height:auto;"></video>
+<video id="v" autoplay playsinline muted></video>
 
 <div>
   <a href="/">⬅ Home</a>
@@ -347,7 +347,7 @@ a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
 <script>
 const video = document.getElementById("v");
 video.src = "/stream/{channel}";
-video.play();
+video.play().catch(e => console.log("Playback prevented:", e));
 </script>
 
 </body>
