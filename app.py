@@ -260,15 +260,15 @@ def stream(channel):
     cmd = [
         "ffmpeg",
         "-i", url,
-        "-vf", "scale=426:240",   # 240p resolution
-        "-r", "25",
+        "-vf", "scale=256:144",   # 160p (approx)
+        "-r", "15",                # low frame rate to save bandwidth
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "250k",
-        "-maxrate", "250k",
-        "-bufsize", "500k",
-        "-g", "50",
+        "-b:v", "100k",            # very low bitrate
+        "-maxrate", "100k",
+        "-bufsize", "200k",
+        "-g", "30",
         "-an",                     # no audio
         "-f", "mpegts",
         "pipe:1"
@@ -286,33 +286,6 @@ def stream(channel):
             proc.terminate()
 
     return Response(generate(), mimetype="video/mp2t")
-
-@app.route("/audio/<channel>")
-def audio_only(channel):
-    url = TV_STREAMS.get(channel) or CACHE.get(channel)
-    if not url:
-        return "Channel not ready", 503
-
-    def generate():
-        cmd = [
-            "ffmpeg", "-i", url,
-            "-vn",               # no video
-            "-ac", "1",          # mono
-            "-b:a", "40k",       # 40kbps
-            "-f", "mp3",
-            "pipe:1"
-        ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        try:
-            while True:
-                data = proc.stdout.read(1024)
-                if not data:
-                    break
-                yield data
-        finally:
-            proc.terminate()
-
-    return Response(generate(), mimetype="audio/mpeg")
 
 @app.route("/video/<channel>")
 def video_player(channel):
