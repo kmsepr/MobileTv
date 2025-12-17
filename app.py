@@ -252,89 +252,37 @@ document.addEventListener("keydown", function(e) {{
 # -----------------------
 @app.route("/stream/<channel>")
 def stream(channel):
-    # Get source (either static or cached YouTube)
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
 
-    # Transcode to 240p, 40 kbps video-only (no audio)
     cmd = [
-        "ffmpeg", "-loglevel", "quiet", "-i", url,
-        "-vf", "scale=426:240",          # force 240p resolution
-        "-an",                           # no audio
-        "-c:v", "libx264",               # use H.264 codec
-        "-preset", "veryfast",
+        "ffmpeg",
+        "-i", url,
+        "-vf", "scale=426:240",
+        "-an",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "40k",                   # target 40 kbps
-        "-bufsize", "80k",
-        "-f", "hls",                     # output HLS chunks
-        "-hls_time", "4",
-        "-hls_list_size", "3",
-        "-hls_flags", "delete_segments",
-        "-"
+        "-b:v", "40k",
+        "-maxrate", "50k",
+        "-bufsize", "100k",
+        "-f", "mpegts",
+        "pipe:1"
     ]
 
-    # Stream output
     def generate():
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
-                data = proc.stdout.read(1024)
-                if not data:
+                chunk = proc.stdout.read(1024)
+                if not chunk:
                     break
-                yield data
+                yield chunk
         finally:
             proc.terminate()
 
-    return Response(
-        generate(),
-        mimetype="application/vnd.apple.mpegurl"
-    )
-
-@app.route("/video/<channel>")
-def video_only_player(channel):
-    if channel not in TV_STREAMS and channel not in CACHE:
-        abort(404)
-
-    html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Only</title>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<style>
-body {{ background:#000; margin:0; text-align:center; }}
-video {{ width:100%; max-height:100vh; background:#000; }}
-a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
-</style>
-</head>
-<body>
-
-<video id="v" controls autoplay playsinline></video>
-
-<div>
-  <a href="/">⬅ Home</a>
-  <a href="/watch/{channel}">▶ Full Stream</a>
-</div>
-
-<script>
-const video = document.getElementById("v");
-const src = "/stream/{channel}";
-
-if (video.canPlayType("application/vnd.apple.mpegurl")) {{
-    video.src = src;
-}} else if (Hls.isSupported()) {{
-    const hls = new Hls({{lowLatencyMode:true}});
-    hls.loadSource(src);
-    hls.attachMedia(video);
-}}
-</script>
-
-</body>
-</html>
-"""
-    return html
+    return Response(generate(), mimetype="video/mp2t")
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
