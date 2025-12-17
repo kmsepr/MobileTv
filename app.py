@@ -257,20 +257,21 @@ def stream(channel):
     if not url:
         return "Channel not ready", 503
 
-    # FFmpeg command: 144p, no audio, very low bitrate
+    # FFmpeg command: 240p, H.264 video + AAC audio
     cmd = [
         "ffmpeg",
         "-i", url,
-        "-vf", "scale=256:144,setsar=1:1",
-        "-r", "15",              # 15 fps
+        "-vf", "scale=426:240",   # 240p resolution
+        "-r", "25",               # 25 fps
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "40k",           # very low video bitrate
-        "-maxrate", "40k",
-        "-bufsize", "80k",
-        "-g", "30",
-        "-an",                    # no audio
+        "-b:v", "250k",           # low video bitrate
+        "-maxrate", "250k",
+        "-bufsize", "500k",
+        "-g", "50",
+        "-c:a", "aac",
+        "-b:a", "64k",            # audio bitrate
         "-f", "mpegts",
         "pipe:1"
     ]
@@ -316,7 +317,7 @@ def audio_only(channel):
     return Response(generate(), mimetype="audio/mpeg")
 
 @app.route("/video/<channel>")
-def video_only_player(channel):
+def video_player(channel):
     if channel not in TV_STREAMS and channel not in CACHE:
         abort(404)
 
@@ -325,28 +326,19 @@ def video_only_player(channel):
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Only - {channel.replace('_',' ').title()}</title>
+<title>{channel.replace('_',' ').title()}</title>
 <style>
-body {{ background:#000; margin:0; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }}
-video {{ width:240px; height:auto; background:#000; }}
-a {{ color:#0f0; font-size:16px; margin:5px; text-decoration:none; }}
+body {{ margin:0; background:#000; height:100vh; display:flex; justify-content:center; align-items:center; }}
+video {{ width:100%; height:100%; background:#000; }}
 </style>
 </head>
 <body>
-
-<video id="v" autoplay playsinline muted></video>
-
-<div>
-  <a href="/">⬅ Home</a>
-  <a href="/watch/{channel}">▶ Full Stream</a>
-</div>
-
+<video id="v" autoplay controls playsinline></video>
 <script>
 const video = document.getElementById("v");
 video.src = "/stream/{channel}";
 video.play().catch(e => console.log("Playback prevented:", e));
 </script>
-
 </body>
 </html>
 """
