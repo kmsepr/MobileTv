@@ -260,15 +260,15 @@ def stream(channel):
     cmd = [
         "ffmpeg",
         "-i", url,
-        "-vf", "scale=256:144",   # small resolution
-        "-an",                     # no audio
+        "-vf", "scale=160:90",      # smaller resolution
+        "-an",                       # no audio
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "40k",             # total bitrate = 40 kbps
+        "-b:v", "40k",               # 40kbps
         "-maxrate", "40k",
-        "-bufsize", "80k",
-        "-g", "30",
+        "-bufsize", "20k",           # smaller buffer
+        "-g", "15",                  # keyframe every 0.5s
         "-f", "mpegts",
         "pipe:1"
     ]
@@ -277,7 +277,7 @@ def stream(channel):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
-                chunk = proc.stdout.read(1024)
+                chunk = proc.stdout.read(512)  # smaller read size = faster flush
                 if not chunk:
                     break
                 yield chunk
