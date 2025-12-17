@@ -294,8 +294,6 @@ def audio_only(channel):
     if not url:
         return "Channel not ready", 503
 
-    filename = f"{channel}.mp3"
-
     def generate():
         cmd = [
             "ffmpeg", "-i", url,
@@ -315,11 +313,7 @@ def audio_only(channel):
         finally:
             proc.terminate()
 
-    return Response(
-        generate(),
-        mimetype="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+    return Response(generate(), mimetype="audio/mpeg")
 
 @app.route("/video/<channel>")
 def video_only_player(channel):
