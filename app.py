@@ -260,16 +260,18 @@ def stream(channel):
     cmd = [
         "ffmpeg",
         "-i", url,
-        "-vf", "scale=256:144",   # 160p (approx)
-        "-r", "15",                # low frame rate to save bandwidth
+        "-vf", "scale=256:144",   # 160p resolution
+        "-r", "15",                # low frame rate
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "100k",            # very low bitrate
-        "-maxrate", "100k",
-        "-bufsize", "200k",
+        "-b:v", "120k",            # very low video bitrate
+        "-maxrate", "120k",
+        "-bufsize", "240k",
         "-g", "30",
-        "-an",                     # no audio
+        "-c:a", "aac",
+        "-b:a", "16k",             # low bitrate audio
+        "-ac", "1",                # mono
         "-f", "mpegts",
         "pipe:1"
     ]
