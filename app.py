@@ -261,23 +261,24 @@ def stream(channel):
         "ffmpeg",
         "-i", url,
 
-        # ↓↓↓ deliberately reduce quality ↓↓↓
-        "-vf", "scale=224:128:flags=fast_bilinear",  # softer than 256x144
-        "-r", "12",                                  # fewer frames
+        # -------- VIDEO (ULTRA LOW) --------
+        "-vf", "scale=192:108:flags=fast_bilinear",  # below 144p
+        "-r", "10",                                  # very low fps
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
         "-profile:v", "baseline",
         "-level", "3.0",
+        "-pix_fmt", "yuv420p",
+        "-b:v", "28k",
+        "-maxrate", "28k",
+        "-bufsize", "56k",
+        "-g", "20",
 
-        "-b:v", "60k",       # VERY low video bitrate
-        "-maxrate", "60k",
-        "-bufsize", "120k",
-        "-g", "24",
-
-        # audio (just enough to hear)
+        # -------- AUDIO (VOICE ONLY) --------
         "-c:a", "aac",
         "-ac", "1",
+        "-ar", "16000",
         "-b:a", "12k",
 
         "-f", "mpegts",
