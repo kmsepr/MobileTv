@@ -316,6 +316,76 @@ def audio_only(channel):
         mimetype="audio/mpeg",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+@app.route("/video/<channel>")
+def video_only_player(channel):
+    if channel not in TV_STREAMS and channel not in CACHE:
+        abort(404)
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Only</title>
+<style>
+body {{ background:#000; margin:0; text-align:center; }}
+video {{ width:100%; max-height:100vh; background:#000; }}
+a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
+</style>
+</head>
+<body>
+
+<video id="v" controls autoplay playsinline></video>
+
+<div>
+  <a href="/">⬅ Home</a>
+  <a href="/watch/{channel}">▶ Full Stream</a>
+</div>
+
+<script>
+const video = document.getElementById("v");
+video.src = "/stream/{channel}";
+video.play();
+</script>
+
+</body>
+</html>
+"""
+@app.route("/video/<channel>")
+def video_only_player(channel):
+    if channel not in TV_STREAMS and channel not in CACHE:
+        abort(404)
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Only</title>
+<style>
+body {{ background:#000; margin:0; text-align:center; }}
+video {{ width:100%; max-height:100vh; background:#000; }}
+a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
+</style>
+</head>
+<body>
+
+<video id="v" controls autoplay playsinline></video>
+
+<div>
+  <a href="/">⬅ Home</a>
+  <a href="/watch/{channel}">▶ Full Stream</a>
+</div>
+
+<script>
+const video = document.getElementById("v");
+video.src = "/stream/{channel}";
+video.play();
+</script>
+
+</body>
+</html>
+"""
 
 # -----------------------
 # Run Server
