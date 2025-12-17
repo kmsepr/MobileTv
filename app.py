@@ -337,7 +337,7 @@ a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
 </head>
 <body>
 
-<video id="v" controls autoplay playsinline></video>
+<video id="v" controls autoplay playsinline style="width:240px; height:auto;"></video>
 
 <div>
   <a href="/">⬅ Home</a>
