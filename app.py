@@ -162,7 +162,7 @@ window.onload=()=>showTab('tv');
     <img src="{{ logos.get(key) }}">
     <span>{{ key.replace('_',' ').title() }}</span><br>
     <a href="/watch/{{ key }}" style="color:#0ff;">▶ Watch</a> |
-<a href="/stream/{{ key }}" style="color:#f80;">🎥 Video Only</a> |
+<a href="/video/{{ key }}" style="color:#f80;">🎥 Video Only</a> |
 <a href="/audio/{{ key }}" style="color:#ff0;">🎵 Audio</a>
 </div>
 {% endfor %}
@@ -290,6 +290,51 @@ def stream(channel):
         generate(),
         mimetype="application/vnd.apple.mpegurl"
     )
+
+@app.route("/video/<channel>")
+def video_only_player(channel):
+    if channel not in TV_STREAMS and channel not in CACHE:
+        abort(404)
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Only</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+body {{ background:#000; margin:0; text-align:center; }}
+video {{ width:100%; max-height:100vh; background:#000; }}
+a {{ color:#0f0; font-size:18px; display:inline-block; margin:10px; }}
+</style>
+</head>
+<body>
+
+<video id="v" controls autoplay playsinline></video>
+
+<div>
+  <a href="/">⬅ Home</a>
+  <a href="/watch/{channel}">▶ Full Stream</a>
+</div>
+
+<script>
+const video = document.getElementById("v");
+const src = "/stream/{channel}";
+
+if (video.canPlayType("application/vnd.apple.mpegurl")) {{
+    video.src = src;
+}} else if (Hls.isSupported()) {{
+    const hls = new Hls({{lowLatencyMode:true}});
+    hls.loadSource(src);
+    hls.attachMedia(video);
+}}
+</script>
+
+</body>
+</html>
+"""
+    return html
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
