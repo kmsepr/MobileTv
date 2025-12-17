@@ -257,7 +257,7 @@ def stream(channel):
     if not url:
         return "Channel not ready", 503
 
-    # FFmpeg command: 144p, low bitrate, AAC audio
+    # FFmpeg command: 144p, no audio, very low bitrate
     cmd = [
         "ffmpeg",
         "-i", url,
@@ -266,12 +266,11 @@ def stream(channel):
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-tune", "zerolatency",
-        "-b:v", "40k",           # low video bitrate
+        "-b:v", "40k",           # very low video bitrate
         "-maxrate", "40k",
         "-bufsize", "80k",
         "-g", "30",
-        "-c:a", "aac",
-        "-b:a", "12k",           # very low audio bitrate
+        "-an",                    # no audio
         "-f", "mpegts",
         "pipe:1"
     ]
