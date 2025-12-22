@@ -288,39 +288,59 @@ def stream(channel):
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
-    # Get the URL from your sources
     url = TV_STREAMS.get(channel) or CACHE.get(channel)
     if not url:
         return "Channel not ready", 503
 
     def generate():
-        # ffmpeg command: input URL, no video, mono, 40kbps MP3, output to pipe
         cmd = [
-            "ffmpeg", "-i", url,
-            "-vn",          # no video
-            "-ac", "1",     # mono
-            "-b:a", "40k",  # 40kbps
-            "-f", "mp3",
+            "ffmpeg",
+            "-loglevel", "error",
+
+            # 🔁 reconnect for live HLS
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+
+            # ⚡ low latency
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+
+            "-i", url,
+
+            "-vn",              # no video
+            "-ac", "1",         # mono
+            "-ar", "22050",     # low sample rate (saves data)
+            "-c:a", "aac",
+            "-b:a", "40k",
+
+            "-f", "adts",       # 🔥 important for live AAC
             "pipe:1"
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        try:
-            # Stream in chunks of 1024 bytes
-            for chunk in iter(lambda: proc.stdout.read(1024), b''):
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            proc.terminate()
-            proc.wait()
 
-    # Return a streaming response
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=0
+        )
+
+        try:
+            while True:
+                data = proc.stdout.read(4096)
+                if not data:
+                    break
+                yield data
+        finally:
+            proc.kill()
+
     return Response(
         generate(),
-        mimetype="audio/mpeg",
+        mimetype="audio/aac",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "Accept-Ranges": "none"
         }
     )
 @app.route("/video/<channel>")
