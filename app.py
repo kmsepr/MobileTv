@@ -34,9 +34,7 @@ YOUTUBE_STREAMS = {
     "qsc_mukkam": "https://www.youtube.com/c/quranstudycentremukkam/live",
     "valiyudheen_faizy": "https://www.youtube.com/@voiceofvaliyudheenfaizy600/live",
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
-    "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
-    "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
+    
     "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
     "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
     "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
@@ -47,8 +45,7 @@ YOUTUBE_STREAMS = {
     "entri_app": "https://www.youtube.com/@entriapp/live",
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
-    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
+    
 }
 
 # -----------------------
