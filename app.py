@@ -257,35 +257,69 @@ def stream(channel):
 
 @app.route("/audio/<channel>")
 def audio_only(channel):
-    url = TV_STREAMS.get(channel) or CACHE.get(channel)
+
+    # Always refresh YouTube URL
+    if channel in YOUTUBE_STREAMS:
+        url = get_youtube_live_url(YOUTUBE_STREAMS[channel])
+        if not url:
+            return "YouTube stream not available", 503
+    else:
+        url = TV_STREAMS.get(channel)
+
     if not url:
         return "Channel not ready", 503
 
-    filename = f"{channel}.mp3"
-
     def generate():
         cmd = [
-            "ffmpeg", "-i", url,
-            "-vn",               # no video
-            "-ac", "1",          # mono
-            "-b:a", "40k",       # 40kbps
+            "ffmpeg",
+            "-loglevel", "error",
+
+            # 🔴 IMPORTANT live flags
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-probesize", "32",
+            "-analyzeduration", "0",
+
+            "-i", url,
+
+            # 🔊 audio only
+            "-vn",
+            "-ac", "1",
+            "-ar", "22050",
+            "-b:a", "40k",
+
             "-f", "mp3",
             "pipe:1"
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=0
+        )
+
         try:
             while True:
-                data = proc.stdout.read(1024)
-                if not data:
+                chunk = proc.stdout.read(4096)
+                if not chunk:
                     break
-                yield data
+                yield chunk
         finally:
-            proc.terminate()
+            proc.kill()
 
     return Response(
         generate(),
         mimetype="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked"
+        }
     )
 
 # -----------------------
