@@ -297,24 +297,27 @@ def audio_only(channel):
             "ffmpeg",
             "-loglevel", "error",
 
-            # 🔁 reconnect for live HLS
+            # 🔁 critical for live HLS
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "5",
 
-            # ⚡ low latency
+            # ⚡ prevent buffering freeze
             "-fflags", "nobuffer",
             "-flags", "low_delay",
 
             "-i", url,
 
-            "-vn",              # no video
-            "-ac", "1",         # mono
-            "-ar", "22050",     # low sample rate (saves data)
-            "-c:a", "aac",
+            "-vn",                # no video
+            "-ac", "1",           # mono
+            "-ar", "22050",       # low rate (saves data)
+            "-c:a", "libmp3lame",
             "-b:a", "40k",
 
-            "-f", "adts",       # 🔥 important for live AAC
+            # 🔥 MP3 live streaming fix
+            "-flush_packets", "1",
+            "-write_xing", "0",   # IMPORTANT
+            "-f", "mp3",
             "pipe:1"
         ]
 
@@ -336,13 +339,14 @@ def audio_only(channel):
 
     return Response(
         generate(),
-        mimetype="audio/aac",
+        mimetype="audio/mpeg",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Accept-Ranges": "none"
+            "Accept-Ranges": "none",  # 🔥 stops 30% stuck
         }
     )
+
 @app.route("/video/<channel>")
 def video_player(channel):
     if channel not in TV_STREAMS and channel not in CACHE:
