@@ -274,7 +274,7 @@ def audio_only(channel):
             "ffmpeg",
             "-loglevel", "error",
 
-            # 🔴 IMPORTANT live flags
+            # 🔴 critical for live MP3
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "5",
@@ -286,13 +286,14 @@ def audio_only(channel):
 
             "-i", url,
 
-            # 🔊 audio only
             "-vn",
             "-ac", "1",
             "-ar", "22050",
+            "-c:a", "libmp3lame",
             "-b:a", "40k",
 
             "-f", "mp3",
+            "-flush_packets", "1",
             "pipe:1"
         ]
 
@@ -305,7 +306,7 @@ def audio_only(channel):
 
         try:
             while True:
-                chunk = proc.stdout.read(4096)
+                chunk = proc.stdout.read(2048)
                 if not chunk:
                     break
                 yield chunk
@@ -317,11 +318,10 @@ def audio_only(channel):
         mimetype="audio/mpeg",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Transfer-Encoding": "chunked"
+            "Connection": "keep-alive"
+            # ❌ NO Content-Disposition
         }
     )
-
 # -----------------------
 # Run Server
 # -----------------------
