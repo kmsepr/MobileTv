@@ -42,9 +42,7 @@ TV_STREAMS = {
 YOUTUBE_STREAMS = {
     "media_one": "https://www.youtube.com/@MediaoneTVLive/live",
     "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
-
-"skicr_tv": "https://www.youtube.com/@SKICRTV/live",
-    
+    "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
 }
 
 # ============================================================
