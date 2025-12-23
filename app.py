@@ -4,7 +4,6 @@ import threading
 import os
 import logging
 from flask import Flask, Response, render_template_string
-from collections import deque
 
 # -----------------------
 # Configure logging
@@ -23,112 +22,124 @@ YOUTUBE_STREAMS = {
     "skicr_tv": "https://www.youtube.com/@SKICRTV/live",
     "yaqeen_institute": "https://www.youtube.com/@yaqeeninstituteofficial/live",
     "bayyinah_tv": "https://www.youtube.com/@bayyinah/live",
-    "eft_guru": "https://www.youtube.com/@EFTGuru-ql8dk/live",
-    "unacademy_ias": "https://www.youtube.com/@UnacademyIASEnglish/live",
-    "studyiq_hindi": "https://www.youtube.com/@StudyIQEducationLtd/live",
     "aljazeera_arabic": "https://www.youtube.com/@aljazeera/live",
     "aljazeera_english": "https://www.youtube.com/@AlJazeeraEnglish/live",
-    "entri_degree": "https://www.youtube.com/@EntriDegreeLevelExams/live",
-    "xylem_psc": "https://www.youtube.com/@XylemPSC/live",
-    "xylem_sslc": "https://www.youtube.com/@XylemSSLC2023/live",
-    "entri_app": "https://www.youtube.com/@entriapp/live",
-    "entri_ias": "https://www.youtube.com/@EntriIAS/live",
-    "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
-    "voice_rahmani": "https://www.youtube.com/@voiceofrahmaniyya5828/live",
 }
 
 # -----------------------
-# TV Audio Streams (direct URLs)
+# TV Audio Streams (direct m3u8)
 # -----------------------
 TV_STREAMS = {
     "safari_tv": "https://j78dp346yq5r-hls-live.5centscdn.com/safari/live.stream/chunks.m3u8",
-    
     "dd_malayalam": "https://d3eyhgoylams0m.cloudfront.net/v1/manifest/93ce20f0f52760bf38be911ff4c91ed02aa2fd92/ed7bd2c7-8d10-4051-b397-2f6b90f99acb/562ee8f9-9950-48a0-ba1d-effa00cf0478/2.m3u8",
-    "mazhavil_manorama": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8",
     "victers_tv": "https://932y4x26ljv8-hls-live.5centscdn.com/victers/tv.stream/chunks.m3u8",
     "france_24": "https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_500.m3u8",
-    
 }
 
 # -----------------------
-# Cache for direct stream URLs
+# Cache
 # -----------------------
 CACHE = {}
 COOKIES_FILE = "/mnt/data/cookies.txt"
 
 # -----------------------
-# Extract YouTube audio URL
+# Extract YouTube Audio URL
 # -----------------------
 def get_youtube_audio_url(youtube_url: str):
     try:
-        command = ["yt-dlp", "-f", "91", "-g", youtube_url]
+        cmd = [
+            "yt-dlp",
+            "-f", "bestaudio",
+            "--no-playlist",
+            "-g",
+            youtube_url
+        ]
 
         if os.path.exists(COOKIES_FILE):
-            command.insert(1, "--cookies")
-            command.insert(2, COOKIES_FILE)
+            cmd.insert(1, "--cookies")
+            cmd.insert(2, COOKIES_FILE)
 
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
 
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
 
-        logging.error(result.stderr.strip())
+        logging.error(result.stderr)
         return None
 
     except Exception:
-        logging.exception("YouTube extraction error")
+        logging.exception("YouTube extraction failed")
         return None
 
 # -----------------------
-# Refresh YouTube streams
+# Background refresh
 # -----------------------
-def refresh_stream_urls():
+def refresh_streams():
     last_update = {}
     while True:
-        logging.info("🔄 Refreshing YouTube streams")
+        logging.info("🔄 Refreshing YouTube audio URLs")
         now = time.time()
+
         for name, url in YOUTUBE_STREAMS.items():
-            if name not in last_update or now - last_update[name] > 60:
+            if name not in last_update or now - last_update[name] > 120:
                 direct = get_youtube_audio_url(url)
                 if direct:
                     CACHE[name] = direct
                     last_update[name] = now
-                    logging.info(f"✅ {name}")
+                    logging.info(f"✅ {name} updated")
+
         time.sleep(60)
 
-threading.Thread(target=refresh_stream_urls, daemon=True).start()
+threading.Thread(target=refresh_streams, daemon=True).start()
 
 # -----------------------
-# Stream generator (YT + TV)
+# AAC Stream Generator
 # -----------------------
 def generate_stream(station_name: str):
     if station_name in TV_STREAMS:
         source_url = TV_STREAMS[station_name]
-        logging.info(f"📺 TV audio: {station_name}")
+        logging.info(f"📺 TV AAC: {station_name}")
     else:
         source_url = CACHE.get(station_name)
         if not source_url:
             return
-        logging.info(f"🎵 YouTube audio: {station_name}")
+        logging.info(f"🎵 YT AAC: {station_name}")
 
     while True:
         process = subprocess.Popen(
             [
                 "ffmpeg",
+                "-loglevel", "error",
+
+                "-fflags", "+genpts+nobuffer",
+                "-flags", "low_delay",
+
+                "-rw_timeout", "15000000",
+                "-max_delay", "5000000",
+
                 "-reconnect", "1",
+                "-reconnect_at_eof", "1",
                 "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "10",
+                "-reconnect_delay_max", "5",
+
                 "-user_agent", "Mozilla/5.0",
                 "-i", source_url,
+
                 "-vn",
                 "-ac", "1",
-                "-b:a", "40k",
-                "-f", "mp3",
+                "-ar", "22050",
+
+                "-c:a", "aac",
+                "-b:a", "24k",
+                "-profile:a", "aac_low",
+
+                "-flush_packets", "1",
+                "-f", "adts",
                 "-"
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            bufsize=4096,
+            bufsize=8192,
         )
 
         try:
@@ -148,7 +159,7 @@ def generate_stream(station_name: str):
 def stream(station_name):
     if station_name not in CACHE and station_name not in TV_STREAMS:
         return "Station not found", 404
-    return Response(generate_stream(station_name), mimetype="audio/mpeg")
+    return Response(generate_stream(station_name), mimetype="audio/aac")
 
 # -----------------------
 # Homepage
@@ -202,4 +213,4 @@ def index():
 # Run
 # -----------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=8000, threaded=True)
