@@ -321,31 +321,59 @@ def audio_only(channel):
     if not url:
         return "Channel not ready", 503
 
-    filename = f"{channel}.mp3"
-
     def generate():
         cmd = [
-            "ffmpeg", "-i", url,
-            "-vn",               # no video
-            "-ac", "1",          # mono
-            "-b:a", "40k",       # 40kbps
+            "ffmpeg",
+            "-loglevel", "error",
+
+            # 🔁 reconnect if source drops
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+
+            "-i", url,
+
+            # 🎧 audio only
+            "-vn",
+            "-ac", "1",
+            "-ar", "22050",
+            "-b:a", "48k",
+
+            # ⚡ low latency
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-flush_packets", "1",
+
             "-f", "mp3",
             "pipe:1"
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=0
+        )
+
         try:
             while True:
-                data = proc.stdout.read(1024)
+                data = proc.stdout.read(4096)
                 if not data:
                     break
                 yield data
+        except GeneratorExit:
+            pass
         finally:
-            proc.terminate()
+            proc.kill()
 
     return Response(
         generate(),
         mimetype="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Accept-Ranges": "none"
+        }
     )
 # -----------------------
 # Run Server
