@@ -53,7 +53,7 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
 
-    "kas_ranker": "https://www.youtube.com/@freepscclasses/live",
+    
 }
 
 # -----------------------
