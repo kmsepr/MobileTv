@@ -322,56 +322,71 @@ def audio_only(channel):
         return "Channel not ready", 503
 
     def generate():
-    cmd = [
-        "ffmpeg",
-        "-loglevel", "error",
+        cmd = [
+            "ffmpeg",
+            "-loglevel", "error",
 
-        # reconnect if source drops
-        "-reconnect", "1",
-        "-reconnect_streamed", "1",
-        "-reconnect_delay_max", "5",
+            # reconnect if source drops
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+            "-timeout", "15000000",
+            "-user_agent", "Mozilla",
 
-        "-i", url,
+            "-i", url,
 
-        # audio only
-        "-vn",
-        "-ac", "1",              # mono
-        "-ar", "44100",          # IMPORTANT
-        "-c:a", "aac",
-        "-profile:a", "aac_low",
-        "-b:a", "40k",
+            # audio only
+            "-vn",
+            "-ac", "1",                 # mono
+            "-ar", "44100",              # IMPORTANT (avoid AM sound)
+            "-c:a", "aac",
+            "-profile:a", "aac_low",
+            "-b:a", "40k",
 
-        # speech clarity
-        "-af", "highpass=f=100,lowpass=f=8000",
+            # speech clarity
+            "-af", "highpass=f=100,lowpass=f=8000",
 
-        # low latency
-        "-fflags", "nobuffer",
-        "-flags", "low_delay",
-        "-flush_packets", "1",
+            # low latency but stable
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-flush_packets", "1",
 
-        "-f", "adts",
-        "pipe:1"
-    ]
+            "-f", "adts",
+            "pipe:1"
+        ]
 
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        bufsize=0
-    )
+        while True:  # 🔁 auto-restart ffmpeg
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                bufsize=0
+            )
 
-    try:
-        while True:
-            data = proc.stdout.read(4096)
-            if not data:
+            try:
+                while True:
+                    data = proc.stdout.read(4096)
+
+                    if data:
+                        yield data
+                    else:
+                        # ⚠️ do NOT exit on short stream gaps
+                        time.sleep(0.1)
+
+                    if proc.poll() is not None:
+                        break
+
+            except GeneratorExit:
+                proc.kill()
                 break
-            yield data
-    finally:
-        proc.kill()
+            finally:
+                proc.kill()
+
+            time.sleep(1)  # small delay before reconnect
 
     return Response(
         generate(),
-        mimetype="audio/mpeg",
+        mimetype="audio/aac",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
