@@ -336,8 +336,8 @@ def audio_only(channel):
             # 🎧 audio only
             "-vn",
             "-ac", "1",
-            "-ar", "22050",
-            "-b:a", "48k",
+            "-ar", "44100",
+            "-b:a", "40k",
 
             # ⚡ low latency
             "-fflags", "nobuffer",
