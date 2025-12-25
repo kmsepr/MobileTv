@@ -322,34 +322,34 @@ def audio_only(channel):
         return "Channel not ready", 503
 
     def generate():
-    cmd = [
-    "ffmpeg",
-    "-loglevel", "error",
+        cmd = [
+            "ffmpeg",
+            "-loglevel", "error",
 
-    "-reconnect", "1",
-    "-reconnect_streamed", "1",
-    "-reconnect_delay_max", "5",
-    "-timeout", "15000000",
-    "-user_agent", "Mozilla",
-    "-allowed_extensions", "ALL",
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+            "-timeout", "15000000",
+            "-user_agent", "Mozilla",
+            "-allowed_extensions", "ALL",
 
-    "-i", url,
+            "-i", url,
 
-    "-vn",
-    "-ac", "1",
-    "-ar", "44100",
-    "-c:a", "aac",
-    "-profile:a", "aac_low",
-    "-b:a", "40k",
-    "-af", "highpass=f=100,lowpass=f=8000",
+            "-vn",
+            "-ac", "1",
+            "-ar", "44100",
+            "-c:a", "aac",
+            "-profile:a", "aac_low",
+            "-b:a", "40k",
+            "-af", "highpass=f=100,lowpass=f=8000",
 
-    "-audio_buffer_size", "64k",
-    "-fflags", "+genpts",
-    "-max_delay", "500000",
+            "-audio_buffer_size", "64k",
+            "-fflags", "+genpts",
+            "-max_delay", "500000",
 
-    "-f", "adts",
-    "pipe:1"
-    ]
+            "-f", "adts",
+            "pipe:1"
+        ]
 
         while True:  # 🔁 auto-restart ffmpeg
             proc = subprocess.Popen(
@@ -366,7 +366,6 @@ def audio_only(channel):
                     if data:
                         yield data
                     else:
-                        # ⚠️ do NOT exit on short stream gaps
                         time.sleep(0.1)
 
                     if proc.poll() is not None:
@@ -378,7 +377,7 @@ def audio_only(channel):
             finally:
                 proc.kill()
 
-            time.sleep(1)  # small delay before reconnect
+            time.sleep(1)
 
     return Response(
         generate(),
