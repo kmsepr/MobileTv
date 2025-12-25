@@ -322,38 +322,34 @@ def audio_only(channel):
         return "Channel not ready", 503
 
     def generate():
-        cmd = [
-            "ffmpeg",
-            "-loglevel", "error",
+    cmd = [
+    "ffmpeg",
+    "-loglevel", "error",
 
-            # reconnect if source drops
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_delay_max", "5",
-            "-timeout", "15000000",
-            "-user_agent", "Mozilla",
+    "-reconnect", "1",
+    "-reconnect_streamed", "1",
+    "-reconnect_delay_max", "5",
+    "-timeout", "15000000",
+    "-user_agent", "Mozilla",
+    "-allowed_extensions", "ALL",
 
-            "-i", url,
+    "-i", url,
 
-            # audio only
-            "-vn",
-            "-ac", "1",                 # mono
-            "-ar", "44100",              # IMPORTANT (avoid AM sound)
-            "-c:a", "aac",
-            "-profile:a", "aac_low",
-            "-b:a", "40k",
+    "-vn",
+    "-ac", "1",
+    "-ar", "44100",
+    "-c:a", "aac",
+    "-profile:a", "aac_low",
+    "-b:a", "40k",
+    "-af", "highpass=f=100,lowpass=f=8000",
 
-            # speech clarity
-            "-af", "highpass=f=100,lowpass=f=8000",
+    "-audio_buffer_size", "64k",
+    "-fflags", "+genpts",
+    "-max_delay", "500000",
 
-            # low latency but stable
-            "-fflags", "nobuffer",
-            "-flags", "low_delay",
-            "-flush_packets", "1",
-
-            "-f", "adts",
-            "pipe:1"
-        ]
+    "-f", "adts",
+    "pipe:1"
+    ]
 
         while True:  # 🔁 auto-restart ffmpeg
             proc = subprocess.Popen(
