@@ -53,7 +53,7 @@ YOUTUBE_STREAMS = {
     "entri_ias": "https://www.youtube.com/@EntriIAS/live",
     "studyiq_english": "https://www.youtube.com/@studyiqiasenglish/live",
 
-    
+
 }
 
 # -----------------------
@@ -326,26 +326,30 @@ def audio_only(channel):
             "ffmpeg",
             "-loglevel", "error",
 
+            # reconnect if source drops
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "5",
             "-timeout", "15000000",
             "-user_agent", "Mozilla",
-            "-allowed_extensions", "ALL",
 
             "-i", url,
 
+            # audio only
             "-vn",
-            "-ac", "1",
-            "-ar", "44100",
+            "-ac", "1",                 # mono
+            "-ar", "44100",              # IMPORTANT (avoid AM sound)
             "-c:a", "aac",
             "-profile:a", "aac_low",
             "-b:a", "40k",
+
+            # speech clarity
             "-af", "highpass=f=100,lowpass=f=8000",
 
-            "-audio_buffer_size", "64k",
-            "-fflags", "+genpts",
-            "-max_delay", "500000",
+            # low latency but stable
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-flush_packets", "1",
 
             "-f", "adts",
             "pipe:1"
@@ -366,6 +370,7 @@ def audio_only(channel):
                     if data:
                         yield data
                     else:
+                        # ⚠️ do NOT exit on short stream gaps
                         time.sleep(0.1)
 
                     if proc.poll() is not None:
@@ -377,7 +382,7 @@ def audio_only(channel):
             finally:
                 proc.kill()
 
-            time.sleep(1)
+            time.sleep(1)  # small delay before reconnect
 
     return Response(
         generate(),
