@@ -322,49 +322,52 @@ def audio_only(channel):
         return "Channel not ready", 503
 
     def generate():
-        cmd = [
-            "ffmpeg",
-            "-loglevel", "error",
+    cmd = [
+        "ffmpeg",
+        "-loglevel", "error",
 
-            # 🔁 reconnect if source drops
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_delay_max", "5",
+        # reconnect if source drops
+        "-reconnect", "1",
+        "-reconnect_streamed", "1",
+        "-reconnect_delay_max", "5",
 
-            "-i", url,
+        "-i", url,
 
-            # 🎧 audio only
-            "-vn",
-            "-ac", "1",
-            "-ar", "44100",
-            "-b:a", "40k",
+        # audio only
+        "-vn",
+        "-ac", "1",              # mono
+        "-ar", "44100",          # IMPORTANT
+        "-c:a", "aac",
+        "-profile:a", "aac_low",
+        "-b:a", "40k",
 
-            # ⚡ low latency
-            "-fflags", "nobuffer",
-            "-flags", "low_delay",
-            "-flush_packets", "1",
+        # speech clarity
+        "-af", "highpass=f=100,lowpass=f=8000",
 
-            "-f", "mp3",
-            "pipe:1"
-        ]
+        # low latency
+        "-fflags", "nobuffer",
+        "-flags", "low_delay",
+        "-flush_packets", "1",
 
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            bufsize=0
-        )
+        "-f", "adts",
+        "pipe:1"
+    ]
 
-        try:
-            while True:
-                data = proc.stdout.read(4096)
-                if not data:
-                    break
-                yield data
-        except GeneratorExit:
-            pass
-        finally:
-            proc.kill()
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        bufsize=0
+    )
+
+    try:
+        while True:
+            data = proc.stdout.read(4096)
+            if not data:
+                break
+            yield data
+    finally:
+        proc.kill()
 
     return Response(
         generate(),
